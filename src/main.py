@@ -96,6 +96,7 @@ async def reload(interaction: discord.Interaction):
             await interaction.response.send_message(f"Reloaded {ext}")
 
         guild = discord.Object(bot.discord_config.guild)
+        bot.tree.clear_commands(guild=guild)
         bot.tree.copy_global_to(guild=guild)
         await bot.tree.sync(guild=guild)
     else:
