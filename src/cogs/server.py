@@ -1,4 +1,4 @@
-from logging import error
+import logging
 import json
 
 import discord
@@ -167,7 +167,7 @@ class Taurus(commands.Cog):
             embed.add_field(name="", value="\u200b")
 
             # heartbeat
-            under_load = bool(heartbeat.split()[1])
+            under_load = heartbeat.split()[1] == "true"
             if under_load:
                 embed.color = 0xfab387
             under_load = "Yes" if under_load else "No"
@@ -181,7 +181,7 @@ class Taurus(commands.Cog):
 
             await interaction.response.send_message(embed=embed)
         except:
-            error(f"Failed to create embed")
+            logging.error(f"Failed to create embed")
             await interaction.response.send_message(f'Check command failed!', ephemeral=True)
 
 async def setup(bot: PropertyBot):
