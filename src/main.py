@@ -8,12 +8,13 @@ import logging
 
 import asyncio
 from asyncio import Queue
+from discord.ext import commands
 
 from websockets import client
 
 import discord
 from discord import app_commands
-from discord.ext.commands import Bot
+from discord.ext import commands
 
 class DiscordConfig:
     def __init__(self, config: dict) -> None:
@@ -47,11 +48,11 @@ class MCServer:
         self.websocket = websocket
         self.config = config
 
-class PropertyBot(Bot):
+class PropertyBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
-        super().__init__(command_prefix=":", intents=intents)
+        super().__init__(command_prefix="$", intents=intents)
 
         self.init_extensions = [ "server" ]
         self.webhook: Optional[discord.Webhook] = None
@@ -93,12 +94,16 @@ async def reload(interaction: discord.Interaction):
     if interaction.user.id == bot.discord_config.maintainer:
         for ext in bot.init_extensions:
             await bot.reload_extension('cogs.'+ext)
-            await interaction.response.send_message(f"Reloaded {ext}")
+            await interaction.response.send_message(f"Reloaded {ext}", ephemeral=True)
+    else:
+        await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
-        guild = discord.Object(bot.discord_config.guild)
-        bot.tree.clear_commands(guild=guild)
-        bot.tree.copy_global_to(guild=guild)
-        await bot.tree.sync(guild=guild)
+@bot.tree.command()
+@app_commands.checks.has_role(bot.discord_config.admin_role)
+async def sync(interaction: discord.Interaction):
+    if interaction.user.id == bot.discord_config.maintainer:
+        await bot.tree.sync()
+        await interaction.response.send_message("Syncing...", ephemeral=True)
     else:
         await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
