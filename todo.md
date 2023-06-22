@@ -1,41 +1,54 @@
 Core functionality:
-- Beta testing bot
+- ~~Beta bot~~
 
 - ~~Restart taurus bridge~~
 - ~~Bridge list~~
-- Replies
+- ~~Replies~~
 - ~~Show when there's an image~~
 - ~~Server list~~
 
 - Taurus integration
   - ~~Chat Bridge~~
-  - Server management
+  - ~~Server management~~
     - ~~Start~~
     - ~~Shutdown~~
     - ~~Restart~~
-    - Whitelist
-    - Backup
-      - Backup
-      - List
-      - Prune
-    - Toggle bridge
-    - Info
-      - Backup size
-      - World size
-  - Visitor
-    - Statistics
-    - Server age
+    - ~~Whitelist~~
+
+  - Backup
+    - ~~Do~~
+    - ~~List~~
+    - ~~Remove~~
+    - ~~World Size~~
+    - ~~Backups Size~~
+
   - Chef
-    - Server CPU, RAM usage, TPS, MSPT
+    - Statistics
+
+    - Server Health
+      - **MSPT (TPS)**
+        - Maybe get special handler
+      - ~~CPU~~
+      - ~~RAM~~
+      - ~~Disk~~
+
     - Online players
-    - Tasks
+
     - Command output
-  - Head Chef
-- Help Command
-- Public documentation
-- Server welcome
-- Voting
-- Music bot
+      - Need special handler
+      - Ping
+
+    - Tasks
+    - Voting
+    - Welcome message
+  - ~~Head Chef~~
+
+- Documentation
+- Pet the cat
+
+
 - Ticket bot
-- Discord server moderation
-- Webhook management
+
+- Music bot
+- Server Moderation
+- WebHook Management

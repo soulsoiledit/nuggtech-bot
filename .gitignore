@@ -162,4 +162,4 @@ cython_debug/
 # personal
 .direnv/
 .envrc
-src/secrets.toml
+src/config.toml

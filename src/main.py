@@ -1,123 +1,151 @@
 import tomllib
 import re
+import argparse
+from typing import Optional
+
+import logging
+
 import asyncio
+from asyncio import Queue
+
 from websockets import client
 
 import discord
-from discord import Webhook
-from discord.ext import commands
-
-class PropertyBot(commands.Bot):
-    def __init__(self, command_prefix, intents) -> None:
-        super().__init__(command_prefix, intents=intents)
-        self.config = {}
-        self.sockets = {}
-        self.webhook = None
-        self.tasks = []
-
-class SocketServer:
-    def __init__(self, socket, server: dict, online: bool = False) -> None:
-        self.socket = socket
-        self.server = server
-        self.online = online
+from discord import app_commands
+from discord.ext.commands import Bot
 
 class DiscordConfig:
-    pass
+    def __init__(self, config: dict) -> None:
+        self.token = config["bot_token"]
+        self.avatar = config["avatar"]
+        self.color = config["color"]
+        self.reply_color = config["reply_color"]
+
+        self.guild = config["guild"]
+        self.webhook = config["webhook_id"]
+        self.bridge_channel = config["bridge_channel_id"]
+        self.log_channel = config["log_channel_id"]
+
+        self.member_role = config["member_role"]
+        self.admin_role = config["admin_role"]
+        self.maintainer = config["maintainer"]
 
 class ServerConfig:
-    pass
+    def __init__(self, server_config: dict) -> None:
+        self.name = server_config["name"]
+        self.ip = server_config["ip"]
+        self.port = server_config["port"]
+        self.ws_pass = server_config["ws_password"]
 
-filepath = "./secrets.toml"
-with open(filepath, "rb") as f:
-    config = tomllib.load(f)
-discord_config = config["discord"]
+        self.display_name = server_config["display_name"]
+        self.nickname = server_config["nickname"]
+        self.color = server_config["color"]
 
-extensions = [ 'server' ]
+class MCServer:
+    def __init__(self, websocket: client.WebSocketClientProtocol, config: ServerConfig) -> None:
+        self.websocket = websocket
+        self.config = config
 
-bot_token = discord_config["bot_token"]
-bridge_channel_id = discord_config["bridge_channel_id"]
-webhook_id = discord_config["webhook_id"]
-default_avatar = discord_config["default_avatar"]
-default_color = discord_config["color"]
+class PropertyBot(Bot):
+    def __init__(self) -> None:
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(command_prefix=":", intents=intents)
 
-intents = discord.Intents.default()
-intents.message_content = True
+        self.init_extensions = [ "server" ]
+        self.webhook: Optional[discord.Webhook] = None
 
-bot = PropertyBot(command_prefix='/', intents=intents)
-bot.config = config
+        with open("./config.toml", "rb") as f:
+            config = tomllib.load(f)
+            self.discord_config: DiscordConfig = DiscordConfig(config["discord"])
+            self.server_config: list[ServerConfig] = [ 
+                ServerConfig(server_config) for server_config in config["servers"]
+            ]
 
+        self.servers: dict[str, MCServer] = {}
+        self.listeners = []
+        self.old_messages: Queue = Queue(maxsize=1)
+
+    async def setup_hook(self):
+        self.webhook = await self.fetch_webhook(self.discord_config.webhook)
+
+        for extension in self.init_extensions:
+            await bot.load_extension('cogs.'+extension)
+            print(f"Loaded extension {extension}!")
+
+bot = PropertyBot()
 regexs = {
     "join_messsage": re.compile(r"\[.*\] (.*) (left|joined) the game"),
     "chat_message": re.compile(r"<(.*)> (.*)"),
-    "server_status": re.compile(r"LIST(.*)"),
+    "server_status": re.compile(r".* (\d+) .* (\d+)"),
+    "backup_file": re.compile(r"(\S+\.tar\.gz) \((.*) (.*)\)")
 }
 
-@bot.tree.command()
-async def echo(interaction: discord.Interaction, arg: str):
-    webhook: Webhook = await bot.fetch_webhook(webhook_id)
-    for server in config["servers"]:
-        name = server["name"]
-        await interaction.response.send_message(f"I said {arg} to {name}!")
-        await webhook.send(f"I said {arg} to {name} in a webhook!", username="soiledit_", avatar_url=default_avatar)
+@app_commands.command()
+@app_commands.checks.cooldown(rate=1, per=60)
+async def pet(interaction: discord.Interaction):
+    await interaction.response.send_message(f"Meow! ({bot.latency*1000:.1f} ms)")
 
-@bot.tree.command()
+@app_commands.command()
+@app_commands.checks.has_role(bot.discord_config.admin_role)
 async def reload(interaction: discord.Interaction):
-    for ext in extensions:
-        await bot.reload_extension('commands.'+ext)
-        await interaction.response.send_message(f"Reloaded {ext}")
+    if interaction.user.id == bot.discord_config.maintainer:
+        for ext in bot.init_extensions:
+            await bot.reload_extension('cogs.'+ext)
+            await interaction.response.send_message(f"Reloaded {ext}")
 
-@bot.event
-async def setup_hook():
-    pass
-
-@bot.event
-async def on_ready():
-    print("Ready!")
-
-    bot.webhook = await bot.fetch_webhook(webhook_id)
-
-    for ext in extensions:
-        await bot.load_extension('commands.'+ext)
-        print(f"Loaded extension {ext}!")
-
-    # await bot.tree.sync()
-
-    await reset_bridges(bot)
+        guild = discord.Object(bot.discord_config.guild)
+        bot.tree.copy_global_to(guild=guild)
+        await bot.tree.sync(guild=guild)
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
     if isinstance(error, discord.app_commands.MissingRole):
         await interaction.response.send_message("Missing permissions!", ephemeral=True)
+    elif isinstance(error, discord.app_commands.CommandOnCooldown):
+        await interaction.response.send_message(f"Command on cooldown! Try again in {error.retry_after:.0f}s...", ephemeral=True)
 
 @bot.event
-async def on_message(message: discord.Message):
-    username = message.author.name
-    if message.channel.id == bridge_channel_id and not message.author.bot:
+async def on_ready():
+    print("Ready!")
+    await setup_bridges(bot)
 
-        if message.author.nick:
-            username = message.author.nick
+@bot.event
+async def on_message(msg: discord.Message):
+    if msg.channel.id == bot.discord_config.bridge_channel and not msg.author.bot:
+        user = msg.author.name
+        message = str(msg.clean_content)
 
-        final_message = str(message.clean_content)
+        if msg.attachments:
+            message += " [IMG]"
 
-        if message.attachments:
-            final_message = f"{final_message} [Image]"
+        # Handle replies
+        reply = msg.reference
+        reply_user = None
+        reply_message = None
 
-        #TODO: handle replies better
-        if message.reference:
-            final_message = f"{final_message} [Reply]"
+        if reply is not None:
+            reply = reply.resolved
+            if isinstance(reply, discord.Message):
+                reply_user = reply.author.name
+                reply_message = reply.clean_content
 
-        await tr_message(bot, username, final_message, None)
+                if reply.attachments:
+                    reply_message += " [IMG]"
 
-async def setup_connection(server_config: dict, sockets: dict):
-    server_name = server_config["name"]
+        formatted = await format_message(bot, "Discord", user, message, reply_user, reply_message)
+        await bridge_chat(bot, formatted)
+
+async def setup_connection(server_config: ServerConfig, servers: dict[str, MCServer]):
+    server_name = server_config.name
     try:
         print("Attempting websocket connection to {}".format(server_name))
 
-        url = "ws://{}:{}/taurus".format(server_config["ip"], server_config["port"])
+        url = "ws://{}:{}/taurus".format(server_config.ip, server_config.port)
         websocket = await client.connect(url)
-        await websocket.send(server_config["ws_password"])
+        await websocket.send(server_config.ws_pass)
 
-        sockets[server_name] = SocketServer(websocket, server_config)
+        servers[server_name] = MCServer(websocket, server_config)
         print(f"Connected to {server_name}!")
 
         return True
@@ -125,132 +153,193 @@ async def setup_connection(server_config: dict, sockets: dict):
         print(f"Failed to connect to {server_name}!")
         return False
 
-async def process_join_message(content: re.Match, webhook: Webhook, chatbridge_config):
+async def process_join_message(bot: PropertyBot, content: re.Match, server_config: ServerConfig):
     username = content.group(1)
     action = content.group(2)
 
-    bot_username = chatbridge_config["username"]
-    nickname = chatbridge_config["nickname"]
+    bot_username = server_config.display_name
+    nickname = server_config.nickname
 
     discord_message = f"*{username} {action} the {nickname}!*"
-    await webhook.send(discord_message, username=bot_username, avatar_url=default_avatar)
+    if bot.webhook:
+        await bot.webhook.send(discord_message, username=bot_username, avatar_url=bot.discord_config.avatar)
 
-async def process_chat_message(content: re.Match, webhook, server_config):
+async def process_chat_message(content: re.Match, webhook: discord.Webhook, server_config: ServerConfig):
     username = content.group(1).replace("\\", "")
     message = content.group(2)
     avatar = f"https://mc-heads.net/head/{username}.png"
 
     await webhook.send(message, username=username, avatar_url=avatar)
-    await tr_message(bot, username, message,server_config)
 
-async def listen(socketserver: SocketServer, webhook: Webhook):
-    websocket = socketserver.socket
-    server_config = socketserver.server
+    source = server_config.display_name
+    formatted = await format_message(bot, source, username, message )
+    await bridge_chat(bot, formatted, server_config.name)
 
-    server_name = server_config["name"]
+async def listen(bot: PropertyBot, server: MCServer):
+    webhook = bot.webhook
+    websocket = server.websocket
+    server_config = server.config
+
+    server_name = server_config.name
     print(f"Setup listener for {server_name}!")
 
-    async for mc_message in websocket:
-        mc_message: str
-        # print(mc_message)
+    async for response in websocket:
+        response = str(response)
+        response_words = response.split()
+        logging.info(response)
 
-        server_status = regexs["server_status"].search(mc_message)
-        if server_status:
-            socketserver.online = len(server_status.group(1).strip()) > 0
+        resp_type = response_words[0]
+        match resp_type:
+            case "MSG":
+                is_join_leave = regexs["join_messsage"].search(response)
+                if is_join_leave:
+                    await process_join_message(bot, is_join_leave, server_config)
+                else:
+                    content = regexs["chat_message"].search(response)
+                    if content and webhook:
+                        await process_chat_message(content, webhook, server_config)
+            case "LIST" | "LIST_BACKUPS" | "BACKUP" | "CHECK" | "HEARTBEAT":
+                await bot.old_messages.put(response)
 
-        is_join_leave = regexs["join_messsage"].search(mc_message)
-        if is_join_leave:
-            await process_join_message(is_join_leave, webhook, server_config["chatbridge"])
-        else:
-            content = regexs["chat_message"].search(mc_message)
-            if content:
-                await process_chat_message(content, webhook, server_config)
+async def process_backup_list(bot: PropertyBot):
+    msg = await bot.old_messages.get()
 
-async def tr_message(bot, user, message, sending_server):
-    for socket in bot.sockets.values():
-        websocket = socket.socket
-        receiving_server = socket.server
-
-        if receiving_server != sending_server:
-            target_server = receiving_server["name"]
-            source_name = "Discord"
-            color = default_color
-
-            if sending_server:
-                source_name = sending_server["chatbridge"]["username"]
-                color = sending_server["chatbridge"]["color"]
-
-            server_message = 'RCON {} tellraw @a ["", {{"text": "[{}] {}:", "color": "{}"}}, {{"text": " {}"}}]'.format(
-                target_server,
-                source_name,
-                user,
-                color,
-                message
-            )
-
-            await websocket.send(server_message)
-
-async def tr_command(bot, target_server, command):
-    socket = bot.sockets[target_server]
-    websocket = socket.socket
-    receiving_server = socket.server
-
-    if receiving_server["name"] == target_server:
-        await websocket.send(command)
-
-async def reset_bridges(bot: PropertyBot):
-    if bot.tasks:
-        task: asyncio.Task
-        for task in bot.tasks:
-            task.cancel()
-        bot.tasks.clear()
-        print("Stopped listeners!")
-
-    for server in config["servers"]:
-        bot.tasks.append(asyncio.create_task(setup_connection(server, bot.sockets)))
-    await asyncio.gather(*bot.tasks)
-
-    await check_server_status(bot)
-
-    bot.tasks.clear()
-    for socket in bot.sockets.values():
-        bot.tasks.append(asyncio.create_task(listen(socket, bot.webhook)))
-
-async def check_server_status(bot: PropertyBot):
-    for socket in bot.sockets.values():
-        socket: SocketServer
-
-        ws = socket.socket
-        name = socket.server["name"]
-
-        await ws.send(f"LIST {name}")
-
-async def check_servers(bot):
-    await check_server_status(bot)
-    await asyncio.sleep(1)
-
-    online_servers = []
-    for socket in bot.sockets.values():
-        socket: SocketServer
-        if socket.online:
-            name = socket.server["name"]
-            online_servers.append(name)
+    embed = discord.Embed(title="Backups", color=0x89b4fa)
 
     description = ""
+    if msg == "LIST_BACKUPS ":
+        description += "There are no backups! :3"
+    else:
+        total = 0
+        count = 1
 
-    for server in bot.config["servers"]:
-        active = ""
-        if server["name"] in online_servers:
-            active = ":white_check_mark:"
-        else:
-            active = ":x:"
+        for line in msg.split("\n"):
+            matches = regexs["backup_file"].search(line)
 
-        description += "**{}:** {}\n".format(server["chatbridge"]["username"], active)
+            if matches:
+                filename = matches.group(1)
+                size = float(matches.group(2))
+                unit = matches.group(3)
 
-    embed = discord.Embed(title="Servers", color=0xff0000, description=description)
-    embed.set_author(name="NuggTech", icon_url=default_avatar)
+                match unit:
+                    case "B":
+                        total += size
+                    case "MiB":
+                        total += size * 1048576
+                    case "GiB":
+                        total += size * 1073741824
+
+                if count <= 10:
+                    description += "{} ({:.1f} {})\n".format(
+                        filename,
+                        size,
+                        unit,
+                    )
+
+                count += 1
+
+        total /= 1048576
+        description += "\n**Total:** {:.2f} MiB".format(
+            total,
+        )
+
+    embed.description = description
+    embed.set_author(name="NuggTech", icon_url=bot.discord_config.avatar)
 
     return embed
 
+async def format_message(bot: PropertyBot, source: str, user: str, message: str, reply_user: Optional[str] = None, reply_message: Optional[str] = None):
+    server_message = ""
+    if reply_user is not None:
+        server_message = 'tellraw @a ["",{{"text":"{}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":">[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+            reply_user,
+            reply_message,
+            bot.discord_config.reply_color,
+            source,
+            user,
+            bot.discord_config.color,
+            message
+        )
+    else:
+        server_message = 'tellraw @a ["",{{"text":"[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+            source,
+            user,
+            bot.discord_config.color,
+            message,
+        )
+
+    return server_message
+   
+async def bridge_chat(bot: PropertyBot, message: str, source_server: Optional[str] = None):
+    for server in bot.servers.keys():
+        if server != source_server:
+            await bridge_send(bot, server, f"CMD {server} {message}")
+
+async def bridge_send(bot: PropertyBot, target_server: str, command: str):
+    server = bot.servers[target_server]
+    ws = server.websocket
+
+    await ws.send(command)
+
+async def setup_bridges(bot: PropertyBot):
+    if bot.listeners:
+        task: asyncio.Task
+        for task in bot.listeners:
+            task.cancel()
+        bot.listeners.clear()
+        print("Stopped listeners!")
+
+    for server in bot.server_config:
+        bot.listeners.append(asyncio.create_task(setup_connection(server, bot.servers)))
+    await asyncio.gather(*bot.listeners)
+
+    bot.listeners.clear()
+    for server in bot.servers.values():
+        bot.listeners.append(asyncio.create_task(listen(bot, server)))
+
+async def check_servers(bot: PropertyBot):
+    online_servers = {}
+    for server in bot.servers.keys():
+        await bridge_send(bot, server, f"LIST {server}")
+        status = await bot.old_messages.get()
+
+        server_status = regexs["server_status"].search(status)
+        if server_status:
+            online = server_status.group(1)
+            total = server_status.group(2)
+            online_servers[server] = online, total
+
+    desc = ""
+    for server in bot.server_config:
+        name = server.name
+        display = server.display_name
+
+        status = ""
+        if name in online_servers.keys():
+            status = ":white_check_mark: ({}/{})".format(
+                online_servers[name][0],
+                online_servers[name][1]
+            )
+        else:
+            status = ":x:"
+
+        desc += "**{}:** {}\n".format(display, status)
+
+
+    embed = discord.Embed(title="Servers", color=0x89b4fa, description=desc)
+    embed.set_author(name="NuggTech", icon_url=bot.discord_config.avatar)
+
+    return embed
+
+def main():
+    parser = argparse.ArgumentParser(allow_abbrev=False)
+    parser.add_argument("--verbosity", help="set verbosity level")
+    args = parser.parse_args()
+
+    if args.verbosity:
+        logging.basicConfig(level=getattr(logging, args.verbosity.upper()))
+
+    asyncio.run(bot.start(bot.discord_config.token))
+
 if __name__ == "__main__":
-    asyncio.run(bot.start(bot_token))
+    main()
