@@ -81,12 +81,12 @@ regexs = {
     "backup_file": re.compile(r"(\S+\.tar\.gz) \((.*) (.*)\)")
 }
 
-@app_commands.command()
+@bot.tree.command()
 @app_commands.checks.cooldown(rate=1, per=60)
 async def pet(interaction: discord.Interaction):
     await interaction.response.send_message(f"Meow! ({bot.latency*1000:.1f} ms)")
 
-@app_commands.command()
+@bot.tree.command()
 @app_commands.checks.has_role(bot.discord_config.admin_role)
 async def reload(interaction: discord.Interaction):
     if interaction.user.id == bot.discord_config.maintainer:
@@ -97,6 +97,8 @@ async def reload(interaction: discord.Interaction):
         guild = discord.Object(bot.discord_config.guild)
         bot.tree.copy_global_to(guild=guild)
         await bot.tree.sync(guild=guild)
+    else:
+        await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
