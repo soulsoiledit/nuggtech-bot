@@ -1,6 +1,7 @@
 import tomllib
 import re
 import argparse
+import random
 from typing import Optional
 
 import logging
@@ -84,7 +85,7 @@ regexs = {
 @bot.tree.command()
 @app_commands.checks.cooldown(rate=1, per=60)
 async def pet(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Meow! ({bot.latency*1000:.1f} ms)")
+    await interaction.response.send_message(f"Me{'o'*random.randint(1, 5)}w! ({bot.latency*1000:.1f} ms)")
 
 @bot.tree.command()
 @app_commands.checks.has_role(bot.discord_config.admin_role)
