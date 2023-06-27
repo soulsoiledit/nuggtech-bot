@@ -15,10 +15,9 @@ bot_ = bot.PropertyBot()
 @bot_.tree.command()
 @app_commands.checks.cooldown(rate=1, per=60)
 async def pet(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Me{'o'*random.randint(1, 5)}w! ({bot.latency*1000:.1f} ms)")
+    whole = random.randint(0, 5)
+    dec = random.randint(0, 9) / 10
 
-@bot.tree.command()
-@app_commands.checks.has_role(bot.discord_config.admin_role)
     should_long_chance = 0.01
     should_long = random.random()
     if should_long < should_long_chance:
@@ -32,6 +31,8 @@ async def pet(interaction: discord.Interaction):
     if interaction.user.id == 1027880469926248458:
         whole = 1
 
+    length = whole + dec
+    await interaction.response.send_message(f"Me{'o'*whole}w! ({length:.1f} s)")
 
 @bot_.tree.command()
 @app_commands.checks.has_role(bot_.discord_config.admin_role)
