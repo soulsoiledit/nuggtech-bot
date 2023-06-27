@@ -32,8 +32,6 @@ Core functionality:
       - ~~RAM~~
       - ~~Disk~~
 
-    - Online players
-
     - Command output
       - Need special handler
       - Ping
@@ -43,9 +41,8 @@ Core functionality:
     - Welcome message
   - ~~Head Chef~~
 
-- Documentation
-- Pet the cat
-
+- Documentation / Help Command
+- ~~Pet the cat~~
 
 - Ticket bot
 
