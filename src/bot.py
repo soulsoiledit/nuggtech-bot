@@ -50,7 +50,8 @@ class PropertyBot(commands.Bot):
             "admin.manage",
             "admin.whitelist",
             "admin.backup",
-            "member"
+            "member",
+            "public"
         ]
         self.webhook: Optional[discord.Webhook] = None
 

@@ -1,6 +1,4 @@
 import argparse
-import random
-
 import logging
 
 import asyncio
@@ -13,34 +11,12 @@ import bot, bridge
 bot_ = bot.PropertyBot()
 
 @bot_.tree.command()
-@app_commands.checks.cooldown(rate=1, per=60)
-async def pet(interaction: discord.Interaction):
-    whole = random.randint(0, 5)
-    dec = random.randint(0, 9) / 10
-
-    should_long_chance = 0.01
-    should_long = random.random()
-    if should_long < should_long_chance:
-        if should_long < should_long_chance / 2:
-            whole = 15
-            dec = 0
-        else:
-            whole = 0
-            dec = 0.01
-
-    if interaction.user.id == 1027880469926248458:
-        whole = 1
-
-    length = whole + dec
-    await interaction.response.send_message(f"Me{'o'*whole}w! ({length:.1f} s)")
-
-@bot_.tree.command()
 @app_commands.checks.has_role(bot_.discord_config.admin_role)
 async def reload(interaction: discord.Interaction):
     if interaction.user.id == bot_.discord_config.maintainer:
         for ext in bot_.init_extensions:
             await bot_.reload_extension('cogs.'+ext)
-            await interaction.response.send_message(f"Reloaded {ext}", ephemeral=True)
+        await interaction.response.send_message(f"Reloaded cogs!", ephemeral=True)
     else:
         await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
