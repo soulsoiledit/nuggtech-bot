@@ -53,8 +53,7 @@ async def process_chat_message(bot: PropertyBot, content: re.Match, webhook: dis
 
     await webhook.send(message, username=username, avatar_url=avatar)
 
-    source = server_config.display_name
-    formatted = await format_message(bot, source, username, message )
+    formatted = await format_message(bot, server_config.name, username, message )
     await bridge_chat(bot, formatted, server_config.name)
 
 async def listen(bot: PropertyBot, server: MCServer):
@@ -132,6 +131,7 @@ async def process_backup_list(bot: PropertyBot):
 
 async def format_message(bot: PropertyBot, source: str, user: str, message: str, reply_user: Optional[str] = None, reply_message: Optional[str] = None):
     server_message = ""
+
     if reply_user is not None:
         server_message = 'tellraw @a ["",{{"text":"{}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":">[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
             reply_user,
@@ -143,10 +143,19 @@ async def format_message(bot: PropertyBot, source: str, user: str, message: str,
             message
         )
     else:
+        name = None
+        color = None
+        if source == "Discord":
+            name = source
+            color = bot.discord_config.color
+        else:
+            name = bot.servers[source].config.display_name
+            color = bot.servers[source].config.color
+
         server_message = 'tellraw @a ["",{{"text":"[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
-            source,
+            name,
             user,
-            bot.discord_config.color,
+            color,
             message,
         )
 
