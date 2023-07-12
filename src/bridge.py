@@ -133,7 +133,7 @@ async def format_message(bot: PropertyBot, source: str, user: str, message: str,
     server_message = ""
 
     if reply_user is not None:
-        server_message = 'tellraw @a ["",{{"text":"{}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":">[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+        server_message = 'tellraw @a ["",{{"text":"┌── {}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":"->[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
             reply_user,
             reply_message,
             bot.discord_config.reply_color,
