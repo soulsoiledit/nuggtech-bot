@@ -25,7 +25,7 @@ async def reload(interaction: discord.Interaction):
 async def sync(interaction: discord.Interaction):
     if interaction.user.id == bot_.discord_config.maintainer:
         guild = discord.Object(bot_.discord_config.guild)
-        bot_.tree.copy_global_to(guild=guild)
+        bot_.tree.clear_commands(guild=guild)
         await bot_.tree.sync(guild=guild)
         # await bot.tree.sync()
         await interaction.response.send_message("Syncing...", ephemeral=True)
