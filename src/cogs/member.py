@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Literal, Optional
 
 import discord
 from discord.ext import commands
@@ -26,6 +27,55 @@ class Member(commands.Cog):
     async def servers(self, interaction: discord.Interaction):
         embed = await check_servers(self.bot)
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(description="Send /counter command to specified server")
+    @app_commands.choices(server=server_choices)
+    @app_commands.checks.has_any_role(*member_role)
+    async def counter(self, interaction: discord.Interaction, server: Choice[str], counter: Optional[Literal[
+        "white",
+        "light_gray",
+        "gray",
+        "black",
+        "red",
+        "orange",
+        "yellow",
+        "lime_green",
+        "green",
+        "light_blue",
+        "cyan",
+        "blue",
+        "purple",
+        "magenta",
+        "pink",
+        "brown",
+    ]] = None):
+        if counter:
+            await bridge_send(self.bot, server.value, f"CMD {server.value} counter {counter}")
+            await interaction.response.send_message(f"Sending `/counter {counter}` to {server.value}...", ephemeral=True)
+        else:
+            await bridge_send(self.bot, server.value, f"CMD {server.value} counter")
+            await interaction.response.send_message(f"Sending `/counter` to {server.value}...", ephemeral=True)
+
+    @app_commands.command(description="Send /tick health command to specified server")
+    @app_commands.choices(server=server_choices)
+    @app_commands.checks.has_any_role(*member_role)
+    async def tickhealth(self, interaction: discord.Interaction, server: Choice[str]):
+        await bridge_send(self.bot, server.value, f"CMD {server.value} tick health")
+        await interaction.response.send_message(f"Sending `tick health` to {server.value}...", ephemeral=True)
+
+    @app_commands.command(description="Send /tick entities command to specified server")
+    @app_commands.choices(server=server_choices)
+    @app_commands.checks.has_any_role(*member_role)
+    async def tickentities(self, interaction: discord.Interaction, server: Choice[str]):
+        await bridge_send(self.bot, server.value, f"CMD {server.value} tick entities")
+        await interaction.response.send_message(f"Sending `/tick entities` to {server.value}...", ephemeral=True)
+
+    @app_commands.command(description="Send /tick warp status command to specified server")
+    @app_commands.choices(server=server_choices)
+    @app_commands.checks.has_any_role(*member_role)
+    async def warpstatus(self, interaction: discord.Interaction, server: Choice[str]):
+        await bridge_send(self.bot, server.value, f"CMD {server.value} tick warp status")
+        await interaction.response.send_message(f"Sending `/tick warp status` to {server.value}...", ephemeral=True)
 
     @app_commands.command(description="Shows info about the target server")
     @app_commands.describe(server="the server to check")

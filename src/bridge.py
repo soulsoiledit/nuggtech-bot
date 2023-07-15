@@ -11,13 +11,6 @@ import discord
 
 from bot import PropertyBot, ServerConfig, MCServer
 
-regexs = {
-    "join_messsage": re.compile(r"\[.*\] (.*) (left|joined) the game"),
-    "chat_message": re.compile(r"<(.*)> (.*)"),
-    "server_status": re.compile(r".* (\d+) .* (\d+)"),
-    "backup_file": re.compile(r"(\S+\.tar\.gz) \((.*) (.*)\)")
-}
-
 async def setup_connection(server_config: ServerConfig, servers: dict[str, MCServer]):
     server_name = server_config.name
     try:
@@ -46,12 +39,13 @@ async def process_join_message(bot: PropertyBot, content: re.Match, server_confi
     if bot.webhook:
         await bot.webhook.send(discord_message, username=bot_username, avatar_url=bot.discord_config.avatar)
 
-async def process_chat_message(bot: PropertyBot, content: re.Match, webhook: discord.Webhook, server_config: ServerConfig):
+async def process_chat_message(bot: PropertyBot, content: re.Match, webhook: Optional[discord.Webhook], server_config: ServerConfig):
     username = content.group(1).replace("\\", "")
     message = content.group(2)
     avatar = f"https://mc-heads.net/head/{username}.png"
 
-    await webhook.send(message, username=username, avatar_url=avatar)
+    if webhook:
+        await webhook.send(message, username=username, avatar_url=avatar)
 
     formatted = await format_message(bot, server_config.name, username, message )
     await bridge_chat(bot, formatted, server_config.name)
@@ -66,21 +60,145 @@ async def listen(bot: PropertyBot, server: MCServer):
 
     async for response in websocket:
         response = str(response)
+
         response_words = response.split()
         logging.info(response)
 
         resp_type = response_words[0]
         match resp_type:
             case "MSG":
-                is_join_leave = regexs["join_messsage"].search(response)
-                if is_join_leave:
+                if is_join_leave := re.search(r"\[.*\] (.*) (left|joined) the game", response):
                     await process_join_message(bot, is_join_leave, server_config)
+                elif content := re.search(r"<(.*)> (.*)", response):
+                    await process_chat_message(bot, content, webhook, server_config)
                 else:
-                    content = regexs["chat_message"].search(response)
-                    if content and webhook:
-                        await process_chat_message(bot, content, webhook, server_config)
+                    # check only commands sent by the server
+                    if not re.search(r"MSG \[.*\] \[", response):
+                        print(repr(response))
+
+                        counter = [
+                            "No items have been",
+                            "No items for",
+                            "hasn't started counting",
+                            "Items for"
+                        ]
+
+                        warp_status = [
+                            "Estimated remaining time",
+                            "Tick warp has not started"
+                        ]
+
+                        if any(search in response for search in counter):
+                            await process_counter(bot, response)
+                        elif "Top 10 counts" in response:
+                            await process_tick_entities(bot, response)
+                        elif "The Rest, whatever" in response:
+                            await process_tick_health(bot, response)
+                        elif any(search in response for search in warp_status):
+                            await process_tick_warp_status(bot, response)
+
             case "LIST" | "LIST_BACKUPS" | "BACKUP" | "CHECK" | "HEARTBEAT":
                 await bot.old_messages.put(response)
+
+async def process_tick_entities(bot: PropertyBot, message: str):
+    infolines = message.split("\n")[1:]
+    embed = discord.Embed(title="/tick entities", color=0xa6e3a1)
+    desc = ""
+    for line in infolines:
+        cleaned = re.sub(r"^\[.*?\] ", "", line)
+        bolded = [
+            "Average tick time",
+            "Top 10 counts:",
+            "Top 10 CPU hogs:"
+        ]
+        if any(x in line for x in bolded):
+            desc += "**"+cleaned+"**\n"
+        else:
+            desc += cleaned+"\n"
+    embed.description = desc
+
+    if bot.webhook:
+        await bot.webhook.send(embed=embed)
+
+async def process_tick_health(bot: PropertyBot, message: str):
+    infolines = message.split("\n")[1:]
+    embed = discord.Embed(title="/tick health", color=0xa6e3a1)
+    desc = ""
+    for line in infolines:
+        cleaned = re.sub(r"^\[.*?\] ", "", line)
+        bolded = [
+            "Average tick time",
+            "overworld:",
+            r"the\_nether:",
+            r"the\_end:",
+        ]
+        if any(x in cleaned for x in bolded):
+            desc += f"**{cleaned}**\n"
+        elif "The Rest, whatever" in cleaned:
+            desc += f"*{cleaned}*\n"
+        else:
+            desc += f"{cleaned}\n"
+    embed.description = desc
+
+    if bot.webhook:
+        await bot.webhook.send(embed=embed)
+
+async def process_counter(bot: PropertyBot, message: str):
+    infolines = message.split("\n")
+    embed = discord.Embed(title="/counter", color=0xa6e3a1)
+    desc = ""
+
+    colormap = {
+        "white": 0xe4e4e4,
+        "light_gray": 0xa0a7a7,
+        "gray": 0x414141,
+        "black": 0x181414,
+        "red": 0x9e2b27,
+        "orange": 0xea7e35,
+        "yellow": 0xc2b51c,
+        "lime_green": 0x39ba2e,
+        "green": 0x364b18,
+        "light_blue": 0x6387d2,
+        "cyan": 0x267191,
+        "blue": 0x253193,
+        "purple": 0x7e34bf,
+        "magenta": 0xbe49c9,
+        "pink": 0xd98199,
+        "brown": 0x56331c,
+    }
+
+    for line in infolines:
+        cleaned = re.sub(r"(^[(MSG )]*\[.*?\] |\[X\])", "", line).strip()
+
+        if "Items for" in cleaned:
+            embed.color = colormap[cleaned.replace("\\_", "_").split()[2]]
+            desc += f"**{cleaned}**\n"
+        else:
+            desc += f"{cleaned}\n"
+
+    embed.description = desc
+
+    if bot.webhook:
+        await bot.webhook.send(embed=embed)
+
+async def process_tick_warp_status(bot: PropertyBot, message: str):
+    infolines = message.split("\n")[1:]
+    embed = discord.Embed(title="/tick warp status", color=0xa6e3a1)
+    desc = ""
+    for line in infolines:
+        cleaned = re.sub(r"^\[.*?\] ", "", line)
+        bolded = [
+            "Average MSPT",
+            "[",
+        ]
+        if any(x in cleaned for x in bolded):
+            desc += f"**{cleaned}**\n"
+        else:
+            desc += f"{cleaned}\n"
+    embed.description = desc
+
+    if bot.webhook:
+        await bot.webhook.send(embed=embed)
 
 async def process_backup_list(bot: PropertyBot):
     msg = await bot.old_messages.get()
@@ -95,7 +213,7 @@ async def process_backup_list(bot: PropertyBot):
         count = 1
 
         for line in msg.split("\n"):
-            matches = regexs["backup_file"].search(line)
+            matches = re.search(r"(\S+\.tar\.gz) \((.*) (.*)\)", line)
 
             if matches:
                 filename = matches.group(1)
@@ -133,7 +251,7 @@ async def format_message(bot: PropertyBot, source: str, user: str, message: str,
     server_message = ""
 
     if reply_user is not None:
-        server_message = 'tellraw @a ["",{{"text":"┌── {}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":"->[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+        server_message = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":"[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
             reply_user,
             reply_message,
             bot.discord_config.reply_color,
@@ -194,7 +312,7 @@ async def check_servers(bot: PropertyBot):
         await bridge_send(bot, server, f"LIST {server}")
         status = await bot.old_messages.get()
 
-        server_status = regexs["server_status"].search(status)
+        server_status = re.search(r".* (\d+) .* (\d+)", status)
         if server_status:
             online = server_status.group(1)
             total = server_status.group(2)

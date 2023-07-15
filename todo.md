@@ -24,17 +24,16 @@ Core functionality:
 
   - Chef
     - Statistics
+      - Use /stat print
 
     - Server Health
-      - **MSPT (TPS)**
-        - Maybe get special handler
+      - ~~**MSPT (TPS)**~~
       - ~~CPU~~
       - ~~RAM~~
       - ~~Disk~~
 
-    - Command output
-      - Need special handler
-      - Ping
+    - ~~Command output~~
+      - ~~Need special handler~~
 
     - Tasks
     - Voting

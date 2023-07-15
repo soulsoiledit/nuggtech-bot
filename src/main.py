@@ -24,10 +24,9 @@ async def reload(interaction: discord.Interaction):
 @app_commands.checks.has_role(bot_.discord_config.admin_role)
 async def sync(interaction: discord.Interaction):
     if interaction.user.id == bot_.discord_config.maintainer:
-        guild = discord.Object(bot_.discord_config.guild)
-        bot_.tree.clear_commands(guild=guild)
-        await bot_.tree.sync(guild=guild)
-        # await bot.tree.sync()
+        if interaction.guild:
+            bot_.tree.copy_global_to(guild=interaction.guild)
+            await bot_.tree.sync(guild=interaction.guild)
         await interaction.response.send_message("Syncing...", ephemeral=True)
     else:
         await interaction.response.send_message("Don't touch this!", ephemeral=True)

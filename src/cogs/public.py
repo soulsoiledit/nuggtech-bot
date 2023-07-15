@@ -17,14 +17,14 @@ class Public(commands.Cog):
         meowchars = round(meowtime)
         meowsage = "Me{}w! ({} s)".format("o" * meowchars, meowtime)
 
-        meowchance = 0.0025
+        meowchance = 0.001
         meowrand = random.random()
 
         if meowrand < 0.01:
             meowsage = "Mw! (1 ns)"
 
         if meowrand < meowchance: 
-            meowchars = 24
+            meowchars = 30
             meowsage = "Me{}w! ({} s)".format("o" * meowchars, meowchars)
 
         await interaction.response.send_message(meowsage)
