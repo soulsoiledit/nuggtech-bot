@@ -156,7 +156,7 @@ async def process_counter(bot: PropertyBot, message: str):
         "red": 0x9e2b27,
         "orange": 0xea7e35,
         "yellow": 0xc2b51c,
-        "lime_green": 0x39ba2e,
+        "lime": 0x39ba2e,
         "green": 0x364b18,
         "light_blue": 0x6387d2,
         "cyan": 0x267191,

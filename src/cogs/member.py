@@ -39,7 +39,7 @@ class Member(commands.Cog):
         "red",
         "orange",
         "yellow",
-        "lime_green",
+        "lime",
         "green",
         "light_blue",
         "cyan",
