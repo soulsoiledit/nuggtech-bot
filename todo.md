@@ -1,50 +1,58 @@
-Core functionality:
-- ~~Beta bot~~
+- Write documentation
 
-- ~~Restart taurus bridge~~
-- ~~Bridge list~~
-- ~~Replies~~
-- ~~Show when there's an image~~
-- ~~Server list~~
+- Use RCON
+- Make reply color lighter
 
-- Taurus integration
-  - ~~Chat Bridge~~
-  - ~~Server management~~
-    - ~~Start~~
-    - ~~Shutdown~~
-    - ~~Restart~~
-    - ~~Whitelist~~
+- Startup
+  - Configuration
+  - Connections
 
-  - Backup
-    - ~~Do~~
-    - ~~List~~
-    - ~~Remove~~
-    - ~~World Size~~
-    - ~~Backups Size~~
+- Chatbridge
+  - Uses `taurus` as the backend
+  - Send messages from MC to Discord channel
+    - Send chat messages
+    - Send player join, leave, and death messages
+    - Broadcast messages to configured servers
+    - Show output from commands send by the Discord bot
+  - Send messages from Discord channel to MC
+    - Send discord messages
+    - Display when there's attached content such as images or files
+    - Indicate reply messages and show the reply user and message
+    - Properly format user mentions, channel names, message links, and emotes
 
-  - Chef
-    - Statistics
-      - Use /stat print
-
-    - Server Health
-      - ~~**MSPT (TPS)**~~
-      - ~~CPU~~
-      - ~~RAM~~
-      - ~~Disk~~
-
-    - ~~Command output~~
-      - ~~Need special handler~~
-
-    - Tasks
-    - Voting
-    - Welcome message
-  - ~~Head Chef~~
-
-- Documentation / Help Command
-- ~~Pet the cat~~
-
-- Ticket bot
-
-- Music bot
-- Server Moderation
-- WebHook Management
+- Commands
+  - Maintainer
+    - Reload configuration
+    - Reload modules
+    - Sync commands
+    - Restart taurus connections
+  - Admin
+    - **Log necessary commands to log channel**
+    - Start server
+    - Stop server
+    - Restart server
+    - Add players to the whitelist
+    - Remove players from the whitelist
+    - List current backups
+    - Create new backups
+    - Send server messages
+  - Member
+    - List servers
+    - Check server health
+    - List players on servers
+    - Carpet integration
+     - /player commands (pending approval)
+     - /profile
+      - health
+      - entities
+     - /spawn
+     - /counter
+     - /tick
+     - Carpet TIS integration
+      - /lifetime
+      - /raid
+      - /scounter
+      - /tick warp status
+  - Public
+    - Pet the NuggCat
+    - Show player statistics from SMP
