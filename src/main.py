@@ -1,84 +1,29 @@
-import argparse
-import logging
-
-import asyncio
-
+import logging, argparse
 import discord
-from discord import app_commands
-
-import bot, bridge
-
-bot_ = bot.PropertyBot()
-
-@bot_.tree.command()
-@app_commands.checks.has_role(bot_.discord_config.admin_role)
-async def reload(interaction: discord.Interaction):
-    if interaction.user.id == bot_.discord_config.maintainer:
-        for ext in bot_.init_extensions:
-            await bot_.reload_extension('cogs.'+ext)
-        await interaction.response.send_message(f"Reloaded cogs!", ephemeral=True)
-    else:
-        await interaction.response.send_message("Don't touch this!", ephemeral=True)
-
-@bot_.tree.command()
-@app_commands.checks.has_role(bot_.discord_config.admin_role)
-async def sync(interaction: discord.Interaction):
-    if interaction.user.id == bot_.discord_config.maintainer:
-        if interaction.guild:
-            bot_.tree.copy_global_to(guild=interaction.guild)
-            await bot_.tree.sync(guild=interaction.guild)
-        await interaction.response.send_message("Syncing...", ephemeral=True)
-    else:
-        await interaction.response.send_message("Don't touch this!", ephemeral=True)
-
-@bot_.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-    if isinstance(error, discord.app_commands.MissingRole):
-        await interaction.response.send_message("Missing permissions!", ephemeral=True)
-    elif isinstance(error, discord.app_commands.CommandOnCooldown):
-        await interaction.response.send_message(f"Command on cooldown! Try again in {error.retry_after:.0f}s...", ephemeral=True)
-
-@bot_.event
-async def on_ready():
-    print("Ready!")
-    await bridge.setup_bridges(bot_)
-
-@bot_.event
-async def on_message(msg: discord.Message):
-    if msg.channel.id == bot_.discord_config.bridge_channel and not msg.author.bot:
-        user = msg.author.name
-        message = str(msg.clean_content)
-
-        if msg.attachments:
-            message += " [IMG]"
-
-        # Handle replies
-        reply = msg.reference
-        reply_user = None
-        reply_message = None
-
-        if reply is not None:
-            reply = reply.resolved
-            if isinstance(reply, discord.Message):
-                reply_user = reply.author.name
-                reply_message = reply.clean_content
-
-                if reply.attachments:
-                    reply_message += " [IMG]"
-
-        formatted = await bridge.format_message(bot_, "Discord", user, message, reply_user, reply_message)
-        await bridge.bridge_chat(bot_, formatted)
-
+from bot import PropertyBot
 
 def main():
-    parser = argparse.ArgumentParser(allow_abbrev=False)
+    parser = argparse.ArgumentParser(
+        description="Discord bot for the NuggTech server",
+        epilog="uwu :3",
+        allow_abbrev=False
+    )
+    parser.add_argument("--config", help="specify configuration file", default="./config.toml")
     parser.add_argument("--verbosity", help="set verbosity level")
     args = parser.parse_args()
 
-    if args.verbosity:
-        logging.basicConfig(level=getattr(logging, args.verbosity.upper()))
+    configfile = args.config
 
-    asyncio.run(bot_.start(bot_.discord_config.token))
+    if args.verbosity:
+        logger = logging.getLogger("nuggtech-bot")
+        logger.setLevel(level=getattr(logging, args.verbosity.upper()))
+        handler = logging.StreamHandler()
+        handler.setFormatter(discord.utils._ColourFormatter())
+        logger.addHandler(handler)
+
+    bot = PropertyBot(configfile)
+
+    bot.run(bot.discord_config.token)
 
 if __name__ == "__main__":
     main()

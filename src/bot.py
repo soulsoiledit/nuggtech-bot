@@ -1,74 +1,114 @@
-import tomllib
-from typing import Optional
+import logging, tomllib
+from typing import Dict, Optional
 
-from asyncio import Queue
-
-from websockets import client
+import asyncio
 
 import discord
+from discord.app_commands import Choice, command
 from discord.ext import commands
+from discord.member import Member
 
-class DiscordConfig:
-    def __init__(self, config: dict) -> None:
-        self.token = config["bot_token"]
-        self.avatar = config["avatar"]
-        self.color = config["color"]
-        self.reply_color = config["reply_color"]
+from bridge import BridgeData, DiscordConfig, QueuedMessage, Server, bridge_send, setup_all_connections
 
-        self.guild = config["guild"]
-        self.webhook = config["webhook_id"]
-        self.bridge_channel = config["bridge_channel_id"]
-        self.log_channel = config["log_channel_id"]
+logger = logging.getLogger("nuggtech-bot")
 
-        self.member_role = config["member_role"]
-        self.admin_role = config["admin_role"]
-        self.maintainer = config["maintainer"]
+def member_check(interaction: discord.Interaction) -> bool:
+    bot = interaction.client
+    user = interaction.user
+    if isinstance(bot, PropertyBot) and isinstance(user, Member):
+        roles = bot.discord_config.member_roles
+        return any(
+            user.get_role(role)
+            for role in roles
+        )
+    else:
+        return False
 
-class ServerConfig:
-    def __init__(self, server_config: dict) -> None:
-        self.name = server_config["name"]
-        self.ip = server_config["ip"]
-        self.port = server_config["port"]
-        self.ws_pass = server_config["ws_password"]
+server_choices = []
 
-        self.display_name = server_config["display_name"]
-        self.nickname = server_config["nickname"]
-        self.color = server_config["color"]
-
-class MCServer:
-    def __init__(self, websocket: client.WebSocketClientProtocol, config: ServerConfig) -> None:
-        self.websocket = websocket
-        self.config = config
+class ServerTransformer(discord.app_commands.Transformer):
+    async def transform(self, interaction: discord.Interaction, value: str) -> str | None:
+        bot = interaction.client
+        if isinstance(bot, PropertyBot):
+            if value in bot.servers.keys():
+                return value
+            else:
+                await interaction.response.send_message("Invalid server selected!", ephemeral=True) 
 
 class PropertyBot(commands.Bot):
-    def __init__(self) -> None:
+    def __init__(self, configfile: str) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
-        super().__init__(command_prefix="$", intents=intents)
+        intents.guilds = True
+        super().__init__(command_prefix="$$", intents=intents)
 
+        self.configfile = configfile
         self.init_extensions = [
+            "maintainer.debug",
             "admin.manage",
             "admin.whitelist",
             "admin.backup",
-            "member",
-            "public"
+            # "member.info",
+            # "member.carpet",
+            "public.pet",
+            # "public.stats"
         ]
+
         self.webhook: Optional[discord.Webhook] = None
 
-        with open("./config.toml", "rb") as f:
-            config = tomllib.load(f)
-            self.discord_config: DiscordConfig = DiscordConfig(config["discord"])
-            self.server_config: list[ServerConfig] = [ 
-                ServerConfig(server_config) for server_config in config["servers"]
-            ]
+        with open(configfile, "rb") as f:
+            server_config = tomllib.load(f)
+            self.discord_config: DiscordConfig = DiscordConfig(server_config["discord"])
 
-        self.servers: dict[str, MCServer] = {}
-        self.listeners = []
-        self.old_messages: Queue = Queue(maxsize=1)
+            self.servers: Dict[str, Server] = {}
+            for server_config in server_config["servers"]:
+                server = Server(server_config)
+                self.servers[server.name] = server
+                server_choices.append(
+                    Choice(name=server.display_name, value=server.name)
+                )
+
+        self.response_queue: asyncio.Queue[QueuedMessage] = asyncio.Queue(maxsize=1)
 
     async def setup_hook(self):
-        self.webhook = await self.fetch_webhook(self.discord_config.webhook)
+        await self.load_cogs()
+        logger.info("Loaded cogs...")
 
+        bridge_channel = await self.fetch_channel(self.discord_config.bridge_channel)
+        if bridge_channel and isinstance(bridge_channel, discord.TextChannel):
+            if len(await bridge_channel.webhooks()) == 0:
+                await bridge_channel.create_webhook(name="chatbridge")
+            self.webhook = (await bridge_channel.webhooks())[0]
+
+        logger.info("Webhook setup!")
+
+
+        if self.webhook:
+            bridge_data = BridgeData(self.discord_config, self.webhook, self.servers, self.response_queue)
+            asyncio.create_task(setup_all_connections(bridge_data))
+
+    async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        if isinstance(error, discord.app_commands.MissingRole) or isinstance(error, discord.app_commands.MissingAnyRole):
+            await interaction.response.send_message("Missing role!", ephemeral=True)
+        else:
+            raise
+
+    async def reload_config(self):
+        with open(self.configfile, "rb") as f:
+            config = tomllib.load(f)
+            self.discord_config: DiscordConfig = DiscordConfig(config["discord"])
+            # TODO: Reload other things
+            #
+            # server configuration
+            # self.server_config: list[ServerConfig] = [ 
+            #     ServerConfig(server_config) for server_config in config["servers"]
+            # ]
+
+    async def load_cogs(self, reloading=False):
         for extension in self.init_extensions:
-            await self.load_extension('cogs.'+extension)
-            print(f"Loaded extension {extension}!")
+            if reloading:
+                await self.reload_extension('cogs.'+extension)
+                logger.info(f"Reloaded {extension}!")
+            else:
+                await self.load_extension('cogs.'+extension)
+                logger.info(f"Loaded {extension}!")
