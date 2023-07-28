@@ -1,9 +1,4 @@
-import re
-from typing import Dict, Optional
-
-import logging
-
-import asyncio
+import re, logging, asyncio
 
 from websockets import client, exceptions
 
@@ -16,10 +11,6 @@ class DiscordConfig:
         self.token = config["bot_token"]
 
         self.maintainer = config["maintainer"]
-        self.admin_roles = config["admin_roles"]
-        self.member_roles = config["member_roles"]
-
-        self.guild = config["guild"]
         self.bridge_channel = config["bridge_channel"]
         self.log_channel = config["log_channel"]
 
@@ -39,22 +30,17 @@ class Server:
         self.color = server_config["color"]
         self.creative = server_config["creative"]
 
-        self.websocket: Optional[client.WebSocketClientProtocol] = None
+        self.websocket: client.WebSocketClientProtocol | None = None
+
+ServersDict = dict[str, Server]
+ResponseQueue = asyncio.Queue[str]
 
 class BridgeData:
-    def __init__(self, config: DiscordConfig, webhook: discord.Webhook, servers: Dict[str, Server], response_queue: asyncio.Queue) -> None:
+    def __init__(self, config: DiscordConfig, webhook: discord.Webhook, servers: ServersDict, response_queue: ResponseQueue) -> None:
         self.config = config
         self.webhook = webhook
         self.servers = servers
         self.response_queue = response_queue
-
-class QueuedMessage:
-    def __init__(self, server: Server, message: str) -> None:
-        self.server = server
-        self.message = message
-
-ServersDict = Dict[str, Server]
-MessageQueue = asyncio.Queue[QueuedMessage]
 
 # Setup connections to all configured servers
 async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
@@ -112,21 +98,14 @@ async def bridge_chat():
 #         if server != source_server:
 #             await bridge_send(bot, server, f"RCON {server} {message}")
 #
-# async def bridge_send(bot: PropertyBot, target_server: str, command: str):
-#     server = bot.servers[target_server]
-#     ws = server.websocket
-#
-#     await ws.send(command)
 
 async def process_response(bridge_data: BridgeData, server: Server, response: str):
-    response_type, content = response.split(maxsplit=1)
+    logger.info(f"RESPONSE: {response}")
 
-    logger.info([response_type, content])
-
-    match response_type:
-        case 'MSG':
-            # Differentiate chat messages, join/leave, and deaths
-            message = content.split(maxsplit=1)[1]
+    match response.split(maxsplit=1):
+        case ['MSG', resp]:
+            # Differentiate chat messages, join/leave, etc
+            message = resp.split(maxsplit=1)[1]
             if chat_msg := re.search(r"<(.*?)> (.*)$", message):
                 await handle_chat(bridge_data, server, chat_msg)
             elif join_msg := re.search(r"(.* (joined|left))", message):
@@ -134,9 +113,14 @@ async def process_response(bridge_data: BridgeData, server: Server, response: st
             else:
                 pass
                 # logger.info(f"Unhandled! {source_server} {message}")
-        case 'RCON':
-            print(f"RCON message from {server.name}!: {content}")
-            await bridge_data.response_queue.put(QueuedMessage(server, content))
+        case ['LIST_BACKUPS', *resp]:
+            print(f"LIST_BACKUPS response received")
+            await bridge_data.response_queue.put(response)
+        case ['RCON', resp]:
+            await bridge_data.response_queue.put(resp)
+            logger.info(f"RCON response from {server.name}!: {resp}")
+        case ['BACKUP', resp]:
+            await bridge_data.response_queue.put(resp)
         case _:
             logger.warn(f"Unhandled message type: {response}")
 
@@ -164,12 +148,6 @@ async def handle_join_leave(bridge_data: BridgeData, source_server: Server, matc
         username=bot_username,
         avatar_url=bridge_data.config.avatar
     )
-
-async def handle_whitelist(response_queue: MessageQueue):
-    response = (await response_queue.get()).message
-    success = response.split()[0]
-    success = success == "Added" or success == "Removed"
-    return (success, response)
 
 # async def process_chat_message(bot: PropertyBot, content: re.Match, webhook: Optional[discord.Webhook], server_config: ServerConfig):
 #     username = content.group(1).replace("\\", "")
@@ -326,52 +304,6 @@ async def handle_whitelist(response_queue: MessageQueue):
 #     if bot.webhook:
 #         await bot.webhook.send(embed=embed)
 #
-# async def process_backup_list(bot: PropertyBot):
-#     msg = await bot.old_messages.get()
-#
-#     embed = discord.Embed(title="Backups", color=0x89b4fa)
-#
-#     description = ""
-#     if msg == "LIST_BACKUPS ":
-#         description += "There are no backups! :3"
-#     else:
-#         total = 0
-#         count = 1
-#
-#         for line in msg.split("\n"):
-#             matches = re.search(r"(\S+\.tar\.gz) \((.*) (.*)\)", line)
-#
-#             if matches:
-#                 filename = matches.group(1)
-#                 size = float(matches.group(2))
-#                 unit = matches.group(3)
-#
-#                 match unit:
-#                     case "B":
-#                         total += size
-#                     case "MiB":
-#                         total += size * 1048576
-#                     case "GiB":
-#                         total += size * 1073741824
-#
-#                 if count <= 10:
-#                     description += "{} ({:.1f} {})\n".format(
-#                         filename,
-#                         size,
-#                         unit,
-#                     )
-#
-#                 count += 1
-#
-#         total /= 1048576
-#         description += "\n**Total:** {:.2f} MiB".format(
-#             total,
-#         )
-#
-#     embed.description = description
-#     embed.set_author(name="NuggTech", icon_url=bot.discord_config.avatar)
-#
-#     return embed
 #
 # async def format_message(bot: PropertyBot, source: str, user: str, message: str, reply_user: Optional[str] = None, reply_message: Optional[str] = None):
 #     server_message = ""
@@ -404,37 +336,3 @@ async def handle_whitelist(response_queue: MessageQueue):
 #         )
 #
 #     return server_message
-#
-# async def check_servers(bot: PropertyBot):
-#     online_servers = {}
-#     for server in bot.servers.keys():
-#         await bridge_send(bot, server, f"LIST {server}")
-#         status = await bot.old_messages.get()
-#
-#         server_status = re.search(r".* (\d+) .* (\d+)", status)
-#         if server_status:
-#             online = server_status.group(1)
-#             total = server_status.group(2)
-#             online_servers[server] = online, total
-#
-#     desc = ""
-#     for server in bot.server_config:
-#         name = server.name
-#         display = server.display_name
-#
-#         status = ""
-#         if name in online_servers.keys():
-#             status = ":white_check_mark: ({}/{})".format(
-#                 online_servers[name][0],
-#                 online_servers[name][1]
-#             )
-#         else:
-#             status = ":x:"
-#
-#         desc += "**{}:** {}\n".format(display, status)
-#
-#
-#     embed = discord.Embed(title="Servers", color=0x89b4fa, description=desc)
-#     embed.set_author(name="NuggTech", icon_url=bot.discord_config.avatar)
-#
-#     return embed

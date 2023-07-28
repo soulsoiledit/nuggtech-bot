@@ -1,10 +1,8 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from discord.app_commands import Choice
 
 import bot
-
 from bridge import bridge_send
 
 class Management(commands.Cog):
@@ -15,7 +13,7 @@ class Management(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def start(self, interaction: discord.Interaction, server: Choice[str]):
+    async def start(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
         target = server.value
         # holy this is cursed but thanks NC
         await interaction.response.defer()
@@ -27,7 +25,7 @@ class Management(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def stop(self, interaction: discord.Interaction, server: Choice[str]):
+    async def stop(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
         target = server.value
         await interaction.response.defer()
         await bridge_send(self.bot.servers, target, f"RCON {server.value} stop")
@@ -37,7 +35,7 @@ class Management(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def restart(self, interaction: discord.Interaction, server: Choice[str]):
+    async def restart(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
         target = server.value
         # holy this is cursed but thanks NC
         await interaction.response.defer()

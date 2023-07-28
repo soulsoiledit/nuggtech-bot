@@ -5,9 +5,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-import bridge
-
-import bot
+import bot, bridge
 
 logger = logging.getLogger("nuggtech-bot")
 
@@ -89,7 +87,9 @@ class Debug(commands.Cog):
     async def fix_bridges(self, interaction: discord.Interaction):
         if interaction.user.id == self.bot.discord_config.maintainer:
             await interaction.response.send_message("Restarted missing bridges...", ephemeral=True)
-            await bridge.setup_all_connections(self.bot.discord_config, self.bot.webhook, self.bot.servers)
+            if self.bot.webhook:
+                bridge_data = bridge.BridgeData(self.bot.discord_config, self.bot.webhook, self.bot.servers, self.bot.response_queue)
+                await bridge.setup_all_connections(bridge_data)
             logger.info("Restarted missing bridges")
         else:
             await interaction.response.send_message("Don't touch this!", ephemeral=True)
@@ -99,7 +99,9 @@ class Debug(commands.Cog):
     async def reset_bridges(self, interaction: discord.Interaction):
         if interaction.user.id == self.bot.discord_config.maintainer:
             await interaction.response.send_message("Restarted all bridges...", ephemeral=True)
-            await bridge.setup_all_connections(self.bot.discord_config, self.bot.webhook, self.bot.servers, close_existing=True)
+            if self.bot.webhook:
+                bridge_data = bridge.BridgeData(self.bot.discord_config, self.bot.webhook, self.bot.servers, self.bot.response_queue)
+                await bridge.setup_all_connections(bridge_data, close_existing=True)
             logger.info("Restarted all bridges")
         else:
             await interaction.response.send_message("Don't touch this!", ephemeral=True)

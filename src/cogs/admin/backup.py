@@ -1,18 +1,9 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.app_commands import Choice
 
-from main import bot_
 import bot
-from bridge import bridge_send, process_backup_list
-
-member_role = bot_.discord_config.member_role
-admin_role = bot_.discord_config.admin_role
-server_choices = [
-    Choice(name=server.display_name, value=server.name)
-    for server in bot_.server_config
-]
+from bridge import bridge_send
 
 class Backup(commands.Cog):
     def __init__(self, bot: bot.PropertyBot):
@@ -23,35 +14,89 @@ class Backup(commands.Cog):
         description="backup commands"
     )
 
+    async def handle_backup_list(self, target: str) -> discord.Embed:
+        backup_list = await self.bot.response_queue.get()
+        server = self.bot.servers[target]
+
+        desc: str = ""
+        if backup_list == "LIST_BACKUPS ":
+            desc = "There are no backups!"
+        else:
+            total = 0
+            lines = 0
+
+            for line in backup_list.replace("LIST_BACKUPS ", "").split("\n"):
+                name, size, unit = line.split()
+                size = float(size[1:])
+                unit = unit[:-1]
+
+                match unit:
+                    case "B":
+                        total += size
+                    case "MiB":
+                        total += size * 1048576
+                    case "GiB":
+                        total += size * 1073741824
+
+                lines += 1
+                if lines < 11:
+                    desc += f"{name} ({size:.1f} {unit})\n"
+
+            if total < 1048576:
+                desc += f"\n**Total:** {total:.2f} B"
+            elif total < 1073741824:
+                total /= 1048576
+                desc += f"\n**Total:** {total:.2f} MiB"
+            else:
+                total /= 1073741824
+                desc += f"\n**Total:** {total:.2f} GiB"
+
+        embed = discord.Embed(
+            title=f"Backups for {server.display_name}:",
+            color=int(server.color[1:], base=16),
+            description=desc
+        )
+        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+
+        return embed
+
+    async def handle_backup_create(self, target: str) -> discord.Embed:
+        result = await self.bot.response_queue.get()
+        server = self.bot.servers[target]
+
+        if result == "starting new backup":
+            color = int(server.color[1:], base=16)
+        else:
+            color = 0xf38ba8
+
+        embed = discord.Embed(
+            title=f"Backup result for {server.display_name}:",
+            color=color,
+            description=result.capitalize()
+        )
+        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+
+        return embed
+
     @backup_commands.command(name="list", description="Lists backups of a server")
-    @app_commands.describe(server="the server to list backups of")
-    @app_commands.choices(server=server_choices)
-    @app_commands.checks.has_role(admin_role)
-    async def list_backups(self, interaction: discord.Interaction, server: Choice[str]):
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(server="target server")
+    @app_commands.choices(server=bot.server_choices)
+    async def list_backups(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
         target = server.value
-        await bridge_send(self.bot, target, "LIST_BACKUPS")
-        embed: discord.Embed = await process_backup_list(self.bot)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await bridge_send(self.bot.servers, target, f"LIST_BACKUPS")
+        await interaction.followup.send(embed=await self.handle_backup_list(target))
 
-    @backup_commands.command(description="Creates a backup of a server")
-    @app_commands.describe(server="the server to create a backup of")
-    @app_commands.choices(server=server_choices)
-    @app_commands.checks.has_role(admin_role)
-    async def create(self, interaction: discord.Interaction, server: Choice[str]):
-        await bridge_send(self.bot, server.value, f"BACKUP {server.value}")
-        result = await self.bot.old_messages.get()
-
-        embed = discord.Embed(title="Result", color=0x89b4fa)
-        embed.set_author(name="NuggTech", icon_url=self.bot.discord_config.avatar)
-
-        if result.find("aborted") >= 0:
-            embed.description = f"Aborted {server.value} backup due to system constraints..."
-            embed.color = 0xf38ba8
-        elif result.find("starting") >= 0:
-            embed.description = f"Starting backup for {server.value}..."
-            embed.color = 0xa6e3a1
-
-        await interaction.response.send_message(embed=embed)
+    @backup_commands.command(name="create", description="Creates a backups for a server")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(server="target server")
+    @app_commands.choices(server=bot.server_choices)
+    async def create_backup(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
+        target = server.value
+        await interaction.response.defer()
+        await bridge_send(self.bot.servers, target, f"BACKUP {target}")
+        await interaction.followup.send(embed=await self.handle_backup_create(target))
 
 async def setup(bot: bot.PropertyBot):
     await bot.add_cog(Backup(bot))
