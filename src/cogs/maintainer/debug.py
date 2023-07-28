@@ -22,15 +22,6 @@ class Debug(commands.Cog):
         else:
             await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
-    @app_commands.command()
-    @app_commands.default_permissions(administrator=True)
-    async def reload_config(self, interaction: discord.Interaction):
-        if interaction.user.id == self.bot.discord_config.maintainer:
-            await interaction.response.send_message(f"Reloaded config!", ephemeral=True)
-            await self.bot.reload_config()
-        else:
-            await interaction.response.send_message("Don't touch this!", ephemeral=True)
-
     @commands.command(name="sync")
     @commands.has_permissions(administrator=True)
     async def text_sync(self, ctx: commands.Context, operation: Literal["quick", "copy", "clear", "global"]):

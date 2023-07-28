@@ -15,13 +15,11 @@ class Backup(commands.Cog):
     )
 
     async def handle_backup_list(self, target: str) -> discord.Embed:
-        backup_list = await self.bot.response_queue.get()
         server = self.bot.servers[target]
+        backup_list = await self.bot.response_queue.get()
 
-        desc: str = ""
-        if backup_list == "LIST_BACKUPS ":
-            desc = "There are no backups!"
-        else:
+        desc = ""
+        if backup_list:
             total = 0
             lines = 0
 
@@ -33,23 +31,30 @@ class Backup(commands.Cog):
                 match unit:
                     case "B":
                         total += size
+                    case "KiB":
+                        total += size * 2**10
                     case "MiB":
-                        total += size * 1048576
+                        total += size * 2**20
                     case "GiB":
-                        total += size * 1073741824
+                        total += size * 2**30
 
                 lines += 1
                 if lines < 11:
                     desc += f"{name} ({size:.1f} {unit})\n"
 
-            if total < 1048576:
+            if total < 2**10:
                 desc += f"\n**Total:** {total:.2f} B"
-            elif total < 1073741824:
-                total /= 1048576
+            elif total < 2**20:
+                total /= 2**10
+                desc += f"\n**Total:** {total:.2f} KiB"
+            elif total < 2**30:
+                total /= 2**20
                 desc += f"\n**Total:** {total:.2f} MiB"
             else:
-                total /= 1073741824
+                total /= 2**30
                 desc += f"\n**Total:** {total:.2f} GiB"
+        else:
+            desc = "There are no backups!"
 
         embed = discord.Embed(
             title=f"Backups for {server.display_name}:",
@@ -61,8 +66,8 @@ class Backup(commands.Cog):
         return embed
 
     async def handle_backup_create(self, target: str) -> discord.Embed:
-        result = await self.bot.response_queue.get()
         server = self.bot.servers[target]
+        result = await self.bot.response_queue.get()
 
         if result == "starting new backup":
             color = int(server.color[1:], base=16)

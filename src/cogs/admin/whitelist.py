@@ -23,8 +23,8 @@ class Whitelist(commands.Cog):
     @whitelist_commands.command(name="add", description="Adds a user to a server's whitelist")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
-    @app_commands.describe(user="target user")
     @app_commands.choices(server=bot.server_choices)
+    @app_commands.describe(user="target user")
     async def whitelist_add(self, interaction: discord.Interaction, server: app_commands.Choice[str], user: str):
         target = server.value
         await interaction.response.defer(ephemeral=True)
@@ -41,8 +41,8 @@ class Whitelist(commands.Cog):
     @whitelist_commands.command(name="remove", description="Removes a user from a server's whitelist")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
-    @app_commands.describe(user="target user")
     @app_commands.choices(server=bot.server_choices)
+    @app_commands.describe(user="target user")
     async def whitelist_remove(self, interaction: discord.Interaction, server: app_commands.Choice[str], user: str):
         target = server.value
         await interaction.response.defer(ephemeral=True)
