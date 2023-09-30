@@ -39,17 +39,27 @@ ServersDict = dict[str, Server]
 ResponseQueue = asyncio.Queue[str]
 
 class BridgeData:
-    def __init__(self, config: DiscordConfig, webhook: discord.Webhook, servers: ServersDict, response_queue: ResponseQueue) -> None:
+    def __init__(
+        self,
+        config: DiscordConfig,
+        webhook: discord.Webhook,
+        servers: ServersDict,
+        response_queue: ResponseQueue,
+        profile_queue: ResponseQueue,
+    ) -> None:
         self.config = config
         self.webhook = webhook
         self.servers = servers
         self.response_queue = response_queue
+        self.profile_queue = profile_queue
+
 
 # Setup connections to all configured servers
 async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
     async with asyncio.TaskGroup() as tg:
         for server in bridge_data.servers.values():
             await tg.create_task(setup_connection(bridge_data, server, close_existing))
+
 
 # Setup connection to single server websocket and start listener
 async def setup_connection(bridge_data: BridgeData, server: Server, close_existing=False) -> None:
