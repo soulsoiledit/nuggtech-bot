@@ -6,8 +6,7 @@ from discord import app_commands
 
 import bridge
 
-logger = logging.getLogger("nuggtech-bot")
-
+logger = logging.getLogger("discord")
 server_choices = []
 
 class PropertyBot(commands.Bot):
