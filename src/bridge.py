@@ -163,7 +163,7 @@ async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match
     tellraw_cmd = await create_tellraw(
         bridge_data.config, bridge_data.servers, source.name, username, message, None
     )
-    await bridge_chat(bridge_chat.servers, source.name, tellraw_cmd)
+    await bridge_chat(bridge_data.servers, source.name, tellraw_cmd)
 
 
 async def handle_join_leave(
