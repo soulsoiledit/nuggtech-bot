@@ -179,3 +179,47 @@ async def handle_join_leave(
         message, username=bot_username, avatar_url=bridge_data.config.avatar
     )
 
+
+async def clear_formatting(message):
+    # Returns repr version of the string with quotes escaped properly
+    return repr(message)[1:-1].replace('"', '\\"')
+
+
+async def create_tellraw(
+    discord_config: DiscordConfig,
+    servers: ServersDict,
+    source: str,
+    username: str,
+    message: str,
+    reply: tuple[str, str] | None,
+):
+    tellraw_cmd = ""
+
+    source_name = None
+    color = None
+    if source == "Discord":
+        source_name = source
+        color = discord_config.color
+    else:
+        source_name = servers[source].display_name
+        color = servers[source].color
+
+    if reply is not None:
+        tellraw_cmd = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":"[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+            reply[0],
+            await clear_formatting(reply[1]),
+            discord_config.reply_color,
+            source_name,
+            username,
+            color,
+            await clear_formatting(message),
+        )
+    else:
+        tellraw_cmd = 'tellraw @a ["",{{"text":"[{}] {}: ","color":"{}"}},{{"text":"{}"}}]'.format(
+            source_name,
+            username,
+            color,
+            await clear_formatting(message),
+        )
+
+    return tellraw_cmd
