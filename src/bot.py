@@ -42,13 +42,13 @@ class PropertyBot(commands.Bot):
         self.webhook: discord.Webhook
 
         with open(configfile, "rb") as f:
-            server_config = tomllib.load(f)
+            config = tomllib.load(f)
             self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
-                server_config["discord"]
+                config["discord"]
             )
 
             self.servers: bridge.ServersDict = {}
-            for server_config in server_config["servers"]:
+            for server_config in config["servers"]:
                 server = bridge.Server(server_config)
                 self.servers[server.name] = server
                 choice = app_commands.Choice(
