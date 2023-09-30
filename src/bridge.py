@@ -153,13 +153,17 @@ async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match
     username = matches.group(1).replace("\\", "")
     message = matches.group(2).replace("\\", "")
 
-    await bridge_data.webhook.send(
-        message,
-        username=username,
-        avatar_url=f"https://mc-heads.net/head/{username}.png"
-    )
+    avatar = f"https://mc-heads.net/head/{username}.png"
+    if " " in avatar:
+        avatar = f"https://mc-heads.net/head/steve.png"
 
-    # TODO: Relay to other servers
+    await bridge_data.webhook.send(message, username=username, avatar_url=avatar)
+
+    tellraw_cmd = await create_tellraw(
+        bridge_data.config, bridge_data.servers, source.name, username, message, None
+    )
+    await bridge_chat(bridge_chat.servers, source.name, tellraw_cmd)
+
 
 async def handle_join_leave(bridge_data: BridgeData, source_server: Server, matches: re.Match):
     action = matches.group()
