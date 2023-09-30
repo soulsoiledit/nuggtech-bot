@@ -128,10 +128,10 @@ async def process_response(bridge_data: BridgeData, server: Server, response: st
     match split_response[0]:
         case "MSG":
             # Differentiate chat messages, join/leave, etc
-            message = response.split(maxsplit=2)[2]
+            message = response
             if chat_msg := re.search(r"<(.*?)> (.*)$", message):
                 await handle_chat(bridge_data, server, chat_msg)
-            elif join_msg := re.search(r".* (joined|left)", message):
+            elif join_msg := re.search(r"\[.*\] (.*) (joined|left)", message):
                 await handle_join_leave(bridge_data, server, join_msg)
             elif re.search(r"Average tick time|Top 10 counts", message):
                 await bridge_data.profile_queue.put(response)
@@ -171,12 +171,13 @@ async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match
 async def handle_join_leave(
     bridge_data: BridgeData, source_server: Server, matches: re.Match
 ):
-    action = matches.group()
+    username = matches.group(1)
+    action = matches.group(2)
 
     bot_username = source_server.display_name
     location = source_server.nickname
 
-    message = f"*{action} the {location}!*"
+    message = f"*{username} {action} the {location}!*"
     await bridge_data.webhook.send(
         message, username=bot_username, avatar_url=bridge_data.config.avatar
     )
