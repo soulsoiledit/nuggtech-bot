@@ -81,6 +81,43 @@ class PropertyBot(commands.Bot):
             self.profile_queue,
         )
         asyncio.create_task(bridge.setup_all_connections(bridge_data))
+
+    async def on_message(self, msg: discord.Message):
+        in_bridge_channel = msg.channel.id = self.discord_config.bridge_channel
+        is_real_user = not msg.author.bot and isinstance(msg.author, discord.Member)
+        if in_bridge_channel and is_real_user:
+            username = msg.author.name
+            message = msg.clean_content
+
+            if msg.attachments:
+                message += " [ATT]"
+
+            # Handle replies
+            reply = msg.reference
+            reply_user = None
+            reply_message = None
+
+            reply_tuple = None
+            if reply:
+                reply = reply.resolved
+                if isinstance(reply, discord.Message):
+                    reply_user = reply.author.name
+                    reply_message = reply.clean_content
+
+                    if reply.attachments:
+                        reply_message += " [ATT]"
+
+                    reply_tuple = (reply_user, reply_message)
+
+            tellraw_cmd = await bridge.create_tellraw(
+                self.discord_config,
+                self.servers,
+                "Discord",
+                username,
+                message,
+                reply_tuple,
+            )
+            await bridge.bridge_chat(self.servers, None, tellraw_cmd)
             await interaction.response.send_message("Missing role!", ephemeral=True)
         else:
             raise
