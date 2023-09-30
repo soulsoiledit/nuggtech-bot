@@ -8,6 +8,8 @@ import bridge
 
 logger = logging.getLogger("discord")
 server_choices = []
+creative_server_choices = []
+
 
 class PropertyBot(commands.Bot):
     def __init__(self, configfile: str) -> None:
@@ -39,9 +41,12 @@ class PropertyBot(commands.Bot):
             for server_config in server_config["servers"]:
                 server = bridge.Server(server_config)
                 self.servers[server.name] = server
-                server_choices.append(
-                    app_commands.Choice(name=server.display_name, value=server.name)
+                choice = app_commands.Choice(
+                    name=server.display_name, value=server.name
                 )
+                server_choices.append(choice)
+                if server.creative:
+                    creative_server_choices.append(choice)
 
         self.response_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
 
