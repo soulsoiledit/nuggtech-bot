@@ -19,6 +19,7 @@ class DiscordConfig:
         self.color = config["color"]
         self.reply_color = config["reply_color"]
 
+
 class Server:
     def __init__(self, server_config: dict) -> None:
         self.name = server_config["name"]
@@ -29,6 +30,7 @@ class Server:
         self.display_name = server_config["display_name"]
         self.nickname = server_config["nickname"]
         self.color = server_config["color"]
+        self.discord_color = discord.Color.from_str(self.color)
         self.creative = server_config["creative"]
 
         self.websocket: client.WebSocketClientProtocol | None = None
