@@ -1,7 +1,6 @@
 import re, logging, asyncio
 
 from websockets import client, exceptions
-
 import discord
 
 logger = logging.getLogger("discord")
@@ -35,6 +34,7 @@ class Server:
 
         self.websocket: client.WebSocketClientProtocol | None = None
 
+
 ServersDict = dict[str, Server]
 ResponseQueue = asyncio.Queue[str]
 
@@ -62,7 +62,9 @@ async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
 
 
 # Setup connection to single server websocket and start listener
-async def setup_connection(bridge_data: BridgeData, server: Server, close_existing=False) -> None:
+async def setup_connection(
+    bridge_data: BridgeData, server: Server, close_existing=False
+) -> None:
     try:
         if server.websocket:
             logger.info(f"Websocket already setup for {server.name}")
@@ -80,8 +82,9 @@ async def setup_connection(bridge_data: BridgeData, server: Server, close_existi
         logger.info(f"Connected to {server.name}!")
 
         await bridge_listen(bridge_data, server)
-    except (ConnectionRefusedError):
+    except ConnectionRefusedError:
         logger.warn(f"Failed to connect to {server.name}")
+
 
 # Listen for messages from websocket and handle closed connections
 async def bridge_listen(bridge_data: BridgeData, server: Server):
@@ -98,19 +101,24 @@ async def bridge_listen(bridge_data: BridgeData, server: Server):
         server.websocket = None
         logger.info(f"Closed connection with {server.name}")
 
+
 async def bridge_send(servers: ServersDict, target: str, command: str):
     websocket = servers[target].websocket
     if websocket:
         await websocket.send(command)
 
-async def bridge_chat():
-    pass
 
-# async def bridge_chat(bot: PropertyBot, message: str, source_server: Optional[str] = None):
-#     for server in bot.servers.keys():
-#         if server != source_server:
-#             await bridge_send(bot, server, f"RCON {server} {message}")
-#
+async def bridge_rcon(servers: ServersDict, target: str, command: str):
+    websocket = servers[target].websocket
+    if websocket:
+        await websocket.send(command)
+
+
+async def bridge_chat(servers: ServersDict, source: str | None, message):
+    for server in servers.keys():
+        if server != source:
+            await bridge_send(servers, server, f"RCON {server} {message}")
+
 
 async def process_response(bridge_data: BridgeData, server: Server, response: str):
     logger.info(f"RESPONSE: {response}")
