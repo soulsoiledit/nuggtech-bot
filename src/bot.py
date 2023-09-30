@@ -23,10 +23,18 @@ class PropertyBot(commands.Bot):
             "maintainer.debug",
             "admin.manage",
             "admin.whitelist",
-            # "admin.rcon",
+            "admin.rcon",
             "admin.backup",
             "member.info",
-            # "member.carpet",
+            "member.carpet.counter",
+            # "member.carpet.lifetime",
+            # "member.carpet.player",
+            # "member.carpet.tick",
+            "member.carpet.profile",
+            "member.carpet.raid",
+            "member.carpet.scounter",
+            "member.carpet.spawn",
+            "member.carpet.warp",
             "public.pet",
             # "public.stats"
         ]
@@ -103,19 +111,21 @@ class PropertyBot(commands.Bot):
     async def reload_config(self):
         with open(self.configfile, "rb") as f:
             config = tomllib.load(f)
-            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(config["discord"])
+            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
+                config["discord"]
+            )
             # TODO: Reload other things
             #
             # server configuration
-            # self.server_config: list[ServerConfig] = [ 
+            # self.server_config: list[ServerConfig] = [
             #     ServerConfig(server_config) for server_config in config["servers"]
             # ]
 
     async def load_cogs(self, reloading=False):
         for extension in self.init_extensions:
             if reloading:
-                await self.reload_extension('cogs.'+extension)
+                await self.reload_extension("cogs." + extension)
                 logger.info(f"Reloaded {extension}!")
             else:
-                await self.load_extension('cogs.'+extension)
+                await self.load_extension("cogs." + extension)
                 logger.info(f"Loaded {extension}!")
