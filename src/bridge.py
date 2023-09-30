@@ -122,28 +122,32 @@ async def bridge_chat(servers: ServersDict, source: str | None, message):
 
 async def process_response(bridge_data: BridgeData, server: Server, response: str):
     logger.info(f"RESPONSE: {response}")
+    split_response = response.split(maxsplit=1)
 
-    match response.split(maxsplit=1):
-        case ['MSG', resp]:
+    match split_response[0]:
+        case "MSG":
             # Differentiate chat messages, join/leave, etc
-            message = resp.split(maxsplit=1)[1]
+            message = response.split(maxsplit=2)[2]
             if chat_msg := re.search(r"<(.*?)> (.*)$", message):
                 await handle_chat(bridge_data, server, chat_msg)
-            elif join_msg := re.search(r"(.* (joined|left))", message):
+            elif join_msg := re.search(r".* (joined|left)", message):
                 await handle_join_leave(bridge_data, server, join_msg)
+            elif re.search(r"Average tick time|Top 10 counts", message):
+                await bridge_data.profile_queue.put(response)
             else:
-                pass
-                # logger.info(f"Unhandled! {source_server} {message}")
-        case ['LIST_BACKUPS', *resp]:
-            print(f"LIST_BACKUPS response received")
-            await bridge_data.response_queue.put(response)
-        case ['RCON', resp]:
-            await bridge_data.response_queue.put(resp)
-            logger.info(f"RCON response from {server.name}!: {resp}")
-        case ['BACKUP', resp]:
-            await bridge_data.response_queue.put(resp)
+                logger.warn(f"Unhandled! {server} {message}")
+        case "RCON":
+            if len(split_response) > 1:
+                await bridge_data.response_queue.put(response.split(maxsplit=1)[1])
+            logger.info(f"RCON response from {server.name}!: {response}")
+        case "LIST_BACKUPS" | "BACKUP" | "LIST" | "CHECK" | "HEARTBEAT":
+            if len(split_response) == 1:
+                await bridge_data.response_queue.put("")
+            else:
+                await bridge_data.response_queue.put(response.split(maxsplit=1)[1])
         case _:
             logger.warn(f"Unhandled message type: {response}")
+
 
 async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match):
     username = matches.group(1).replace("\\", "")
