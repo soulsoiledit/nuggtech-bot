@@ -7,12 +7,15 @@ from discord import app_commands
 import bot
 from bridge import bridge_send
 
+
 class ServerInfo(commands.Cog):
     def __init__(self, bot: bot.PropertyBot):
         self.bot = bot
 
     async def handle_server_status(self) -> discord.Embed:
-        desc = ""
+        embed = discord.Embed(title="Servers:", color=0xA6E3A1)
+        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+
         for server in self.bot.servers.values():
             target = server.name
             await bridge_send(self.bot.servers, target, f"RCON {target} list")
@@ -25,10 +28,10 @@ class ServerInfo(commands.Cog):
                 state = f":white_check_mark: ({online}/{max})"
             else:
                 state = ":x:"
-            desc += f"**{server.display_name}:** {state}\n"
 
-        embed = discord.Embed(title="Servers:", color=0xa6e3a1, description=desc)
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+            embed.add_field(
+                name="", value=f"**{server.display_name}:** {state}\n", inline=False
+            )
 
         return embed
 
@@ -40,16 +43,16 @@ class ServerInfo(commands.Cog):
         desc = ""
         if playerlist:
             if int(playerlist.split()[2]):
-                desc += playerlist.split(": ",maxsplit=1)[1].replace(", ","\n")
+                desc += playerlist.split(": ", maxsplit=1)[1].replace(", ", "\n")
             else:
                 desc = f"**No players are online!**"
         else:
             desc = f"**The server is offline!**"
 
         embed = discord.Embed(
-            title=f"Player list for {server.display_name}:", 
-            color=int(server.color[1:], base=16),
-            description=desc
+            title=f"Player list for {server.display_name}:",
+            color=server.discord_color,
+            description=desc,
         )
         embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
@@ -66,9 +69,9 @@ class ServerInfo(commands.Cog):
         heartbeat = bool(await self.bot.response_queue.get())
 
         embed = discord.Embed(
-            title=f"NuggTech {server.display_name}", 
-            color=int(server.color[1:], base=16),
-            description=":arrow_up: "
+            title=f"NuggTech {server.display_name}",
+            color=server.discord_color,
+            description=":arrow_up: ",
         )
         embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
@@ -105,7 +108,9 @@ class ServerInfo(commands.Cog):
     @app_commands.command(description="lists online players")
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def playerlist(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
+    async def playerlist(
+        self, interaction: discord.Interaction, server: app_commands.Choice[str]
+    ):
         target = server.value
         await interaction.response.defer()
         await interaction.followup.send(embed=await self.handle_playerlist(target))
@@ -113,10 +118,13 @@ class ServerInfo(commands.Cog):
     @app_commands.command(description="check servers health")
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def check(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
+    async def check(
+        self, interaction: discord.Interaction, server: app_commands.Choice[str]
+    ):
         target = server.value
         await interaction.response.defer()
         await interaction.followup.send(embed=await self.handle_server_check(target))
+
 
 async def setup(bot: bot.PropertyBot):
     await bot.add_cog(ServerInfo(bot))
