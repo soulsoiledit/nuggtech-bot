@@ -136,7 +136,7 @@ async def process_response(bridge_data: BridgeData, server: Server, response: st
             elif re.search(r"Average tick time|Top 10 counts", message):
                 await bridge_data.profile_queue.put(response)
             else:
-                logger.warn(f"Unhandled! {server} {message}")
+                logger.warn(f"Unhandled! {server.name} {message}")
         case "RCON":
             if "No player was found" in response:
                 return
