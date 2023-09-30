@@ -4,7 +4,8 @@ from websockets import client, exceptions
 
 import discord
 
-logger = logging.getLogger("nuggtech-bot")
+logger = logging.getLogger("discord")
+
 
 class DiscordConfig:
     def __init__(self, config: dict) -> None:
