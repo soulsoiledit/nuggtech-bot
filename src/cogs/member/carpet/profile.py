@@ -41,6 +41,7 @@ class Profile(commands.Cog):
         embed = discord.Embed(title="`/profile health`")
         embed.color = server.discord_color
         embed.description = cleaned_health
+        embed.set_footer(text=self.bot.servers[target].display_name)
 
         return embed
 
@@ -62,6 +63,7 @@ class Profile(commands.Cog):
         embed = discord.Embed(title="`/profile entities`")
         embed.color = server.discord_color
         embed.description = cleaned_entities
+        embed.set_footer(text=self.bot.servers[target].display_name)
 
         return embed
 
