@@ -30,7 +30,7 @@ class Server:
         self.nickname = server_config["nickname"]
         self.color = server_config["color"]
         self.discord_color = discord.Color.from_str(self.color)
-        self.creative = server_config["creative"]
+        self.creative = server_config["creative"] == "True"
 
         self.websocket: client.WebSocketClientProtocol | None = None
 
