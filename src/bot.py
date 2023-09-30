@@ -49,6 +49,7 @@ class PropertyBot(commands.Bot):
                     creative_server_choices.append(choice)
 
         self.response_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
+        self.profile_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
 
     async def setup_hook(self) -> None:
         await super().setup_hook()
