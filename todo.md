@@ -27,55 +27,54 @@
 
 - Commands
   - Maintainer
-    - ~~Reload configuration~~
-    - ~~Reload modules~~
-    - ~~Sync commands~~
-    - ~~Restart taurus connections~~
+    - Reload configuration
+    - Reload modules
+    - Sync commands
+    - Restart taurus connections
   - Admin
     - **Log necessary commands to log channel**
-    - ~~Start server~~
-    - ~~Stop server~~
-    - ~~Restart server~~
+    - Start server
+    - Stop server
+    - Restart server
     - Whitelist
-      - ~~Add players to the whitelist~~
-      - ~~Remove players from the whitelist~~
+      - Add players to the whitelist
+      - Remove players from the whitelist
       - Add players to OP on creative servers
       - Remove players from OP on creative servers
-      - Add 'all' argument to automatically do on all servers
-    - ~~List current backups~~
-    - ~~Create new backups~~
-    - ~~Arbitrary RCON commands to creative-enabled servers~~
+    - List current backups
+    - Create new backups
+    - Arbitrary RCON commands to creative-enabled servers
   - Member
-    - ~~List servers~~
-    - ~~Check server health~~
-    - ~~List players on servers~~
+    - List servers
+    - Check server health
+    - List players on servers
 
     - Carpet integration
      - /player commands (pending approval)
      - /tick (pending approval)
 
-     - ~~/profile~~
-      - ~~health~~
-      - ~~entities~~
+     - /profile
+      - health
+      - entities
 
-     - ~~/spawn~~
-      - ~~spawn tracking~~
-      - ~~spawn tracking start~~
-      - ~~spawn tracking stop~~
-      - ~~spawn tracking restart~~
-     - ~~/counter~~
-      - ~~counter~~
-      - ~~counter wool~~
-      - ~~counter reset~~
-      - ~~counter wool reset~~
+     - /spawn
+      - spawn tracking
+      - spawn tracking start
+      - spawn tracking stop
+      - spawn tracking restart
+     - /counter
+      - counter
+      - counter wool
+      - counter reset
+      - counter wool reset
 
      - Carpet TIS integration
       - /lifetime
-      - ~~/raid~~
-      - ~~/scounter~~
-      - ~~/tick warp status~~
+      - /raid
+      - /scounter
+      - /tick warp status
   - Public
-    - ~~Pet the NuggCat~~
+    - Pet the NuggCat
     - Show player statistics from SMP
 
 # Bugs
