@@ -59,7 +59,7 @@ class BridgeData:
 async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
     async with asyncio.TaskGroup() as tg:
         for server in bridge_data.servers.values():
-            await tg.create_task(setup_connection(bridge_data, server, close_existing))
+            tg.create_task(setup_connection(bridge_data, server, close_existing))
 
 
 # Setup connection to single server websocket and start listener
