@@ -83,7 +83,7 @@ class PropertyBot(commands.Bot):
         asyncio.create_task(bridge.setup_all_connections(bridge_data))
 
     async def on_message(self, msg: discord.Message):
-        in_bridge_channel = msg.channel.id = self.discord_config.bridge_channel
+        in_bridge_channel = msg.channel.id == self.discord_config.bridge_channel
         is_real_user = not msg.author.bot and isinstance(msg.author, discord.Member)
         if in_bridge_channel and is_real_user:
             username = msg.author.name
