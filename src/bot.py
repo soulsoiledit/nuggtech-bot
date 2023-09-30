@@ -131,19 +131,6 @@ class PropertyBot(commands.Bot):
         else:
             raise
 
-    async def reload_config(self):
-        with open(self.configfile, "rb") as f:
-            config = tomllib.load(f)
-            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
-                config["discord"]
-            )
-            # TODO: Reload other things
-            #
-            # server configuration
-            # self.server_config: list[ServerConfig] = [
-            #     ServerConfig(server_config) for server_config in config["servers"]
-            # ]
-
     async def load_cogs(self, reloading=False):
         for extension in self.init_extensions:
             if reloading:
