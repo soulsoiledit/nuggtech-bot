@@ -39,7 +39,7 @@ class PropertyBot(commands.Bot):
             # "public.stats"
         ]
 
-        self.webhook: discord.Webhook | None = None
+        self.webhook: discord.Webhook
 
         with open(configfile, "rb") as f:
             server_config = tomllib.load(f)
