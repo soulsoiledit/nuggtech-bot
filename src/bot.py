@@ -43,7 +43,9 @@ class PropertyBot(commands.Bot):
 
         with open(configfile, "rb") as f:
             server_config = tomllib.load(f)
-            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(server_config["discord"])
+            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
+                server_config["discord"]
+            )
 
             self.servers: bridge.ServersDict = {}
             for server_config in server_config["servers"]:
@@ -71,39 +73,14 @@ class PropertyBot(commands.Bot):
 
         logger.info("Webhook setup!")
 
-        if self.webhook:
-            bridge_data = bridge.BridgeData(self.discord_config, self.webhook, self.servers, self.response_queue)
-            asyncio.create_task(bridge.setup_all_connections(bridge_data))
-
-    # async def on_ready(self):
-
-    # async def on_message(msg: discord.Message):
-    #     if msg.channel.id == bot_.discord_config.bridge_channel and not msg.author.bot:
-    #         user = msg.author.name
-    #         message = str(msg.clean_content)
-    #
-    #         if msg.attachments:
-    #             message += " [IMG]"
-    #
-    #         # Handle replies
-    #         reply = msg.reference
-    #         reply_user = None
-    #         reply_message = None
-    #
-    #         if reply is not None:
-    #             reply = reply.resolved
-    #             if isinstance(reply, discord.Message):
-    #                 reply_user = reply.author.name
-    #                 reply_message = reply.clean_content
-    #
-    #                 if reply.attachments:
-    #                     reply_message += " [IMG]"
-    #
-    #         formatted = await bridge.format_message(bot_, "Discord", user, message, reply_user, reply_message)
-    #         await bridge.bridge_chat(bot_, formatted)
-
-    async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-        if isinstance(error, discord.app_commands.MissingRole) or isinstance(error, discord.app_commands.MissingAnyRole):
+        bridge_data = bridge.BridgeData(
+            self.discord_config,
+            self.webhook,
+            self.servers,
+            self.response_queue,
+            self.profile_queue,
+        )
+        asyncio.create_task(bridge.setup_all_connections(bridge_data))
             await interaction.response.send_message("Missing role!", ephemeral=True)
         else:
             raise
