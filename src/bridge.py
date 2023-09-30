@@ -138,6 +138,8 @@ async def process_response(bridge_data: BridgeData, server: Server, response: st
             else:
                 logger.warn(f"Unhandled! {server} {message}")
         case "RCON":
+            if "No player was found" in response:
+                return
             if len(split_response) > 1:
                 await bridge_data.response_queue.put(response.split(maxsplit=1)[1])
             logger.info(f"RCON response from {server.name}!: {response}")
