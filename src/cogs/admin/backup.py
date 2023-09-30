@@ -5,14 +5,12 @@ from discord.ext import commands
 import bot
 from bridge import bridge_send
 
+
 class Backup(commands.Cog):
     def __init__(self, bot: bot.PropertyBot):
         self.bot = bot
 
-    backup_commands = app_commands.Group(
-        name="backup",
-        description="backup commands"
-    )
+    backup_commands = app_commands.Group(name="backup", description="backup commands")
 
     async def handle_backup_list(self, target: str) -> discord.Embed:
         server = self.bot.servers[target]
@@ -58,8 +56,8 @@ class Backup(commands.Cog):
 
         embed = discord.Embed(
             title=f"Backups for {server.display_name}:",
-            color=int(server.color[1:], base=16),
-            description=desc
+            color=server.discord_color,
+            description=desc,
         )
         embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
@@ -69,15 +67,10 @@ class Backup(commands.Cog):
         server = self.bot.servers[target]
         result = await self.bot.response_queue.get()
 
-        if result == "starting new backup":
-            color = int(server.color[1:], base=16)
-        else:
-            color = 0xf38ba8
-
         embed = discord.Embed(
             title=f"Backup result for {server.display_name}:",
-            color=color,
-            description=result.capitalize()
+            color=server.discord_color,
+            description=result.capitalize(),
         )
         embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
@@ -87,21 +80,28 @@ class Backup(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def list_backups(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
+    async def list_backups(
+        self, interaction: discord.Interaction, server: app_commands.Choice[str]
+    ):
         target = server.value
         await interaction.response.defer()
         await bridge_send(self.bot.servers, target, f"LIST_BACKUPS")
         await interaction.followup.send(embed=await self.handle_backup_list(target))
 
-    @backup_commands.command(name="create", description="Creates a backups for a server")
+    @backup_commands.command(
+        name="create", description="Creates a backups for a server"
+    )
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(server="target server")
     @app_commands.choices(server=bot.server_choices)
-    async def create_backup(self, interaction: discord.Interaction, server: app_commands.Choice[str]):
+    async def create_backup(
+        self, interaction: discord.Interaction, server: app_commands.Choice[str]
+    ):
         target = server.value
         await interaction.response.defer()
         await bridge_send(self.bot.servers, target, f"BACKUP {target}")
         await interaction.followup.send(embed=await self.handle_backup_create(target))
+
 
 async def setup(bot: bot.PropertyBot):
     await bot.add_cog(Backup(bot))
