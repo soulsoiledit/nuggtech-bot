@@ -118,6 +118,15 @@ class PropertyBot(commands.Bot):
                 reply_tuple,
             )
             await bridge.bridge_chat(self.servers, None, tellraw_cmd)
+
+    async def on_app_command_error(
+        self,
+        interaction: discord.Interaction,
+        error: discord.app_commands.AppCommandError,
+    ):
+        if isinstance(error, discord.app_commands.MissingRole) or isinstance(
+            error, discord.app_commands.MissingAnyRole
+        ):
             await interaction.response.send_message("Missing role!", ephemeral=True)
         else:
             raise
