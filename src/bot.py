@@ -41,13 +41,13 @@ class PropertyBot(commands.Bot):
 
         self.webhook: discord.Webhook
 
+        self.servers: bridge.ServersDict = {}
         with open(configfile, "rb") as f:
             config = tomllib.load(f)
             self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
                 config["discord"]
             )
 
-            self.servers: bridge.ServersDict = {}
             for server_config in config["servers"]:
                 server = bridge.Server(server_config)
                 self.servers[server.name] = server
@@ -118,18 +118,6 @@ class PropertyBot(commands.Bot):
                 reply_tuple,
             )
             await bridge.bridge_chat(self.servers, None, tellraw_cmd)
-
-    async def on_app_command_error(
-        self,
-        interaction: discord.Interaction,
-        error: discord.app_commands.AppCommandError,
-    ):
-        if isinstance(error, discord.app_commands.MissingRole) or isinstance(
-            error, discord.app_commands.MissingAnyRole
-        ):
-            await interaction.response.send_message("Missing role!", ephemeral=True)
-        else:
-            raise
 
     async def load_cogs(self, reloading=False):
         for extension in self.init_extensions:
