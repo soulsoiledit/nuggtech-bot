@@ -25,6 +25,26 @@ class Debug(commands.Cog):
         else:
             await interaction.response.send_message("Don't touch this!", ephemeral=True)
 
+    async def perform_sync_op(self, guild: discord.Guild, operation) -> str:
+        output = ""
+        match operation:
+            case "quick":
+                await self.bot.tree.sync(guild=guild)
+                output = "Synced guild commands"
+            case "copy":
+                self.bot.tree.copy_global_to(guild=guild)
+                await self.bot.tree.sync(guild=guild)
+                output = "Copied and synced commands"
+            case "clear":
+                self.bot.tree.clear_commands(guild=guild)
+                await self.bot.tree.sync(guild=guild)
+                output = "Cleared and synced commands"
+            case "global":
+                await self.bot.tree.sync()
+                output = "Synced global commands"
+        return output
+
+
     @commands.command(name="sync")
     @commands.has_permissions(administrator=True)
     async def text_sync(
@@ -35,23 +55,7 @@ class Debug(commands.Cog):
         if ctx.author.id == self.bot.discord_config.maintainer:
             await ctx.message.delete()
             if ctx.guild:
-                output: str | None
-                match operation:
-                    case "quick":
-                        await self.bot.tree.sync(guild=ctx.guild)
-                        output = "Synced guild commands"
-                    case "copy":
-                        self.bot.tree.copy_global_to(guild=ctx.guild)
-                        await self.bot.tree.sync(guild=ctx.guild)
-                        output = "Copied and synced commands"
-                    case "clear":
-                        self.bot.tree.clear_commands(guild=ctx.guild)
-                        await self.bot.tree.sync(guild=ctx.guild)
-                        output = "Cleared and synced commands"
-                    case "global":
-                        await self.bot.tree.sync()
-                        output = "Synced global commands"
-                logger.info(output)
+                logger.info(await self.perform_sync_op(ctx.guild, operation))
 
     @app_commands.command(name="sync")
     @app_commands.default_permissions(administrator=True)
@@ -63,22 +67,7 @@ class Debug(commands.Cog):
         if interaction.user.id == self.bot.discord_config.maintainer:
             await interaction.response.defer(ephemeral=True)
             if interaction.guild:
-                output: str | None
-                match operation:
-                    case "guild":
-                        await self.bot.tree.sync(guild=interaction.guild)
-                        output = "Synced guild commands"
-                    case "copy":
-                        self.bot.tree.copy_global_to(guild=interaction.guild)
-                        await self.bot.tree.sync(guild=interaction.guild)
-                        output = "Copied and synced commands"
-                    case "clear":
-                        self.bot.tree.clear_commands(guild=interaction.guild)
-                        await self.bot.tree.sync(guild=interaction.guild)
-                        output = "Cleared and synced commands"
-                    case "global":
-                        await self.bot.tree.sync()
-                        output = "Synced global commands"
+                output = await self.perform_sync_op(interaction.guild, operation)
                 logger.info(output)
                 await interaction.followup.send(output, ephemeral=True)
         else:
