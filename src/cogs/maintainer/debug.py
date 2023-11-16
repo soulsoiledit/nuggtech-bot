@@ -44,7 +44,6 @@ class Debug(commands.Cog):
                 output = "Synced global commands"
         return output
 
-
     @commands.command(name="sync")
     @commands.has_permissions(administrator=True)
     async def text_sync(

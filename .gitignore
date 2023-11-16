@@ -163,3 +163,4 @@ cython_debug/
 .direnv/
 .envrc
 src/config.toml
+src/config.py

@@ -15,7 +15,7 @@ class DiscordConfig:
         self.log_channel = config["log_channel"]
 
         self.avatar = config["avatar"]
-        self.color = config["color"]
+        self.name_color = config["color"]
         self.reply_color = config["reply_color"]
 
 
@@ -202,7 +202,7 @@ async def create_tellraw(
     color = None
     if source == "Discord":
         source_name = source
-        color = discord_config.color
+        color = discord_config.name_color
     else:
         source_name = servers[source].display_name
         color = servers[source].color
