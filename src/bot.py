@@ -2,14 +2,22 @@ import logging, asyncio
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 import bridge
 import config
 
 logger = logging.getLogger("discord")
 
-server_choices = config.server_choices
-creative_server_choices = config.creative_server_choices
+server_choices = []
+creative_server_choices = []
+
+for server in config.servers.values():
+    choice = app_commands.Choice(name=server.display_name, value=server.name)
+
+    server_choices.append(choice)
+    if server.creative:
+        creative_server_choices.append(choice)
 
 class PropertyBot(commands.Bot):
     def __init__(self) -> None:
@@ -40,8 +48,8 @@ class PropertyBot(commands.Bot):
 
         self.webhook: discord.Webhook
 
-        self.discord_config: config.DiscordConfig = config.discord_config
-        self.servers: config.ServersDict = config.servers
+        self.discord_config: bridge.DiscordConfig = config.discord_config
+        self.servers: bridge.ServersDict = config.servers
 
         self.response_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
         self.profile_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)

@@ -3,7 +3,34 @@ import re, logging, asyncio
 from websockets import client, exceptions
 import discord
 
-from config import DiscordConfig, ServersDict, Server
+class DiscordConfig:
+    def __init__(self, token, maintainer, bridge_channel, log_channel, avatar, name_color, reply_color) -> None:
+        self.token = token
+
+        self.maintainer = maintainer
+        self.bridge_channel = bridge_channel
+        self.log_channel = log_channel
+
+        self.avatar = avatar
+        self.name_color = name_color
+        self.reply_color = reply_color
+
+class Server:
+    def __init__(self, name, ip, port, ws_password, display_name, nickname, color, creative) -> None:
+        self.name = name
+        self.ip = ip
+        self.port = port
+        self.ws_pass = ws_password
+
+        self.display_name = display_name
+        self.nickname = nickname
+        self.color = color
+        self.discord_color = discord.Color.from_str(self.color)
+        self.creative = creative == "True"
+
+        self.websocket: client.WebSocketClientProtocol | None = None
+
+ServersDict = dict[str, Server]
 
 logger = logging.getLogger("discord")
 
