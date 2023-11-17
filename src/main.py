@@ -8,15 +8,10 @@ def main():
         epilog="uwu :3",
         allow_abbrev=False,
     )
-    parser.add_argument(
-        "--config", help="specify configuration file", default="./config.toml"
-    )
     parser.add_argument("--verbosity", help="set verbosity level", default="warning")
     args = parser.parse_args()
 
-    configfile = args.config
-
-    bot = PropertyBot(configfile)
+    bot = PropertyBot()
 
     log_level = getattr(logging, args.verbosity.upper())
     bot.run(bot.discord_config.token, log_level=log_level)

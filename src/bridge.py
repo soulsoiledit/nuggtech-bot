@@ -3,41 +3,11 @@ import re, logging, asyncio
 from websockets import client, exceptions
 import discord
 
+from config import DiscordConfig, ServersDict, Server
+
 logger = logging.getLogger("discord")
 
-
-class DiscordConfig:
-    def __init__(self, config: dict) -> None:
-        self.token = config["bot_token"]
-
-        self.maintainer = config["maintainer"]
-        self.bridge_channel = config["bridge_channel"]
-        self.log_channel = config["log_channel"]
-
-        self.avatar = config["avatar"]
-        self.name_color = config["color"]
-        self.reply_color = config["reply_color"]
-
-
-class Server:
-    def __init__(self, server_config: dict) -> None:
-        self.name = server_config["name"]
-        self.ip = server_config["ip"]
-        self.port = server_config["port"]
-        self.ws_pass = server_config["ws_password"]
-
-        self.display_name = server_config["display_name"]
-        self.nickname = server_config["nickname"]
-        self.color = server_config["color"]
-        self.discord_color = discord.Color.from_str(self.color)
-        self.creative = server_config["creative"] == "True"
-
-        self.websocket: client.WebSocketClientProtocol | None = None
-
-
-ServersDict = dict[str, Server]
 ResponseQueue = asyncio.Queue[str]
-
 
 class BridgeData:
     def __init__(

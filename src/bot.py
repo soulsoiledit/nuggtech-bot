@@ -1,24 +1,23 @@
-import logging, tomllib, asyncio
+import logging, asyncio
 
 import discord
 from discord.ext import commands
-from discord import app_commands
 
 import bridge
+import config
 
 logger = logging.getLogger("discord")
-server_choices = []
-creative_server_choices = []
 
+server_choices = config.server_choices
+creative_server_choices = config.creative_server_choices
 
 class PropertyBot(commands.Bot):
-    def __init__(self, configfile: str) -> None:
+    def __init__(self) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
         intents.guilds = True
         super().__init__(command_prefix="$$", intents=intents)
 
-        self.configfile = configfile
         self.init_extensions = [
             "maintainer.debug",
             "admin.manage",
@@ -41,22 +40,8 @@ class PropertyBot(commands.Bot):
 
         self.webhook: discord.Webhook
 
-        self.servers: bridge.ServersDict = {}
-        with open(configfile, "rb") as f:
-            config = tomllib.load(f)
-            self.discord_config: bridge.DiscordConfig = bridge.DiscordConfig(
-                config["discord"]
-            )
-
-            for server_config in config["servers"]:
-                server = bridge.Server(server_config)
-                self.servers[server.name] = server
-                choice = app_commands.Choice(
-                    name=server.display_name, value=server.name
-                )
-                server_choices.append(choice)
-                if server.creative:
-                    creative_server_choices.append(choice)
+        self.discord_config: config.DiscordConfig = config.discord_config
+        self.servers: config.ServersDict = config.servers
 
         self.response_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
         self.profile_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
