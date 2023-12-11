@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+import math
 import bot
 import random
 
@@ -11,21 +12,27 @@ class Pet(commands.Cog):
         self.bot = bot
 
     @app_commands.command(description="pet the nuggcat")
-    # @app_commands.checks.cooldown(rate=1, per=60)
     async def pet(self, interaction: discord.Interaction):
-        meowlen = random.randint(1, 69)
-        meowchars = meowlen // 10
-        meowsage = "Me{}w! ({:.1f} s)".format("o" * meowchars, meowlen / 10)
+        meowlen = -1
+        meowchars = -1
 
-        meowrand = random.random()
+        if random.random() < 0.01:
+            meowlen = random.gauss(10, 10)
+            if meowlen <= 10:
+                meowlen = 0
+                meowchars = -1
+            else:
+                meowchars = round(meowlen)
+                meowlen = round(meowlen, 1)
+        else:
+            meowlen = round(random.randint(1, 69) / 10, 1)
+            meowchars = math.floor(meowlen)
 
-        if meowrand < 0.01:
+        meowsage = ""
+        if meowlen == 0:
             meowsage = "Mw! (1 ns)"
-
-        meowchance = 0.001
-        if meowrand < meowchance:
-            meowchars = random.randint(20, 30)
-            meowsage = "Me{}w! ({}.0 s)".format("o" * meowchars, meowchars)
+        else:
+            meowsage = "Me{}w! ({} s)".format("o" * meowchars, meowlen)
 
         await interaction.response.send_message(meowsage)
 
