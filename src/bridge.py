@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import re
-import json
 
 import discord
 from websockets import client, exceptions
@@ -42,7 +41,7 @@ class Server:
         self.nickname = nickname
         self.color = color
         self.discord_color = discord.Color.from_str(self.color)
-        self.creative = creative == "True"
+        self.creative = creative
 
         self.websocket: client.WebSocketClientProtocol | None = None
 
