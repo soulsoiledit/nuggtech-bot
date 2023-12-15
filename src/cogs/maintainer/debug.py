@@ -5,7 +5,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-import bot, bridge
+import bot
+import bridge
 
 logger = logging.getLogger("nuggtech-bot")
 
@@ -18,9 +19,7 @@ class Debug(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     async def reload(self, interaction: discord.Interaction):
         if interaction.user.id == self.bot.discord_config.maintainer:
-            await interaction.response.send_message(
-                f"Reloaded modules!", ephemeral=True
-            )
+            await interaction.response.send_message("Reloaded modules!", ephemeral=True)
             await self.bot.load_cogs(reloading=True)
         else:
             await interaction.response.send_message("Don't touch this!", ephemeral=True)

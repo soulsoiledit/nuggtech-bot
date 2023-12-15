@@ -14,7 +14,6 @@ class ServerInfo(commands.Cog):
 
     async def handle_server_status(self) -> discord.Embed:
         embed = discord.Embed(title="Servers:", color=0xA6E3A1)
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
         for server in self.bot.servers.values():
             target = server.name
@@ -45,58 +44,57 @@ class ServerInfo(commands.Cog):
             if int(playerlist.split()[2]):
                 desc += playerlist.split(": ", maxsplit=1)[1].replace(", ", "\n")
             else:
-                desc = f"**No players are online!**"
+                desc = "**No players are online!**"
         else:
-            desc = f"**The server is offline!**"
+            desc = "**The server is offline!**"
 
+        server = self.bot.servers[target]
         embed = discord.Embed(
             title=f"Player list for {server.display_name}:",
-            color=server.discord_color,
             description=desc,
+            color=server.discord_color,
         )
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
 
         return embed
 
     async def handle_server_check(self, target: str) -> discord.Embed:
-        server = self.bot.servers[target]
-
-        await bridge_send(self.bot.servers, target, f"CHECK")
+        await bridge_send(self.bot.servers, target, "CHECK")
         health = await self.bot.response_queue.get()
         health_dict = json.loads(health)
 
-        await bridge_send(self.bot.servers, target, f"HEARTBEAT")
-        heartbeat = bool(await self.bot.response_queue.get())
-
-        embed = discord.Embed(
-            title=f"NuggTech {server.display_name}",
-            color=server.discord_color,
-            description=":arrow_up: ",
-        )
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+        await bridge_send(self.bot.servers, target, "HEARTBEAT")
+        heartbeat = (await self.bot.response_queue.get()) == "true"
 
         cpu_avg = health_dict["cpu_avg"][1]
         if cpu_avg is None:
             cpu_avg = health_dict["cpu_avg"][0]
         cpu_avg = float(cpu_avg) * 100
 
-        embed.add_field(name=":brain: CPU Avg", value=f"{cpu_avg:.1f}%")
-        embed.add_field(name="", value="\u200b")
-
         ram_used = float(health_dict["ram"][0])
         ram_total = float(health_dict["ram"][1])
         ram_perc = ram_used / ram_total * 100
-        embed.add_field(name=":ram: RAM Usage", value=f"{ram_perc:.1f}%")
 
         disk_perc = float(health_dict["disk_info"][0][2]) * 100
-        embed.add_field(name=":cd: Disk Usage", value=f"{disk_perc:.1f}%")
-        embed.add_field(name="", value="\u200b")
-
-        embed.add_field(name=":two_hearts: Struggling?", value=heartbeat)
 
         uptime = int(health_dict["uptime"])
         days = uptime / 86400
-        embed.description = f":arrow_up: Server has been up for {days:.1f} days"
+        uptime_msg = f":arrow_up: Server has been up for {days:.1f} days"
+
+        server = self.bot.servers[target]
+
+        embed = discord.Embed(
+            title=f"NuggTech {server.display_name}",
+            description=uptime_msg,
+            color=server.discord_color,
+        )
+
+        embed.add_field(name=":brain: CPU Avg", value=f"{cpu_avg:.1f}%")
+        embed.add_field(name="", value="\u200b")
+        embed.add_field(name=":ram: RAM Usage", value=f"{ram_perc:.1f}%")
+
+        embed.add_field(name=":cd: Disk Usage", value=f"{disk_perc:.1f}%")
+        embed.add_field(name="", value="\u200b")
+        embed.add_field(name=":two_hearts: Struggling?", value=heartbeat)
 
         return embed
 

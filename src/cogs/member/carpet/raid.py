@@ -42,13 +42,11 @@ class RaidTracking(commands.Cog):
         )
 
         server = self.bot.servers[target]
-        embed = discord.Embed()
-        embed.title = "`/raid tracking{}`".format(
-            " " + subcommand if subcommand else ""
+        embed = discord.Embed(
+            title="`/raid tracking{}`".format(" " + subcommand if subcommand else ""),
+            description=raid,
+            color=server.discord_color,
         )
-        embed.description = raid
-        # embed.description = f"`{repr(raid)}`"
-        embed.color = server.discord_color
         embed.set_footer(text=server.display_name)
 
         return embed

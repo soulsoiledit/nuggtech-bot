@@ -60,30 +60,31 @@ class SupplyCounter(commands.Cog):
     async def handle_scounter(
         self, target: str, color: str | None, reset: bool = False
     ) -> discord.Embed:
-        server = self.bot.servers[target]
         counter = await self.bot.response_queue.get()
         counter = counter.replace("[X]", "")
         counter = counter.replace("/h)", "/h)\n").replace("/h)\n:", "/h):\n")
 
-        embed = discord.Embed()
-
         colorcmd = f"`/scounter {color}" if color else "`/scounter"
         resetcmd = " reset`" if reset else "`"
-        embed.title = f"{colorcmd}{resetcmd}"
-        embed.set_footer(text=server.display_name)
 
+        embed_color = 0
         desc = ""
         counterlines = counter.split("\n")
         for line in counterlines:
             if "Items for" in line:
-                embed.color = colormap[line.split()[2]]
+                embed_color = colormap[line.split()[2]]
                 desc += f"**{line}**\n"
             else:
                 desc += f"{line}\n"
-        embed.description = desc
 
         if color:
-            embed.color = colormap[color]
+            embed_color = colormap[color]
+
+        server = self.bot.servers[target]
+        embed = discord.Embed(
+            title=f"{colorcmd}{resetcmd}", description=desc, color=embed_color
+        )
+        embed.set_footer(text=server.display_name)
 
         return embed
 

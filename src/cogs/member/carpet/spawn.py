@@ -32,12 +32,13 @@ class SpawnTracking(commands.Cog):
             "stopped.", "stopped.**"
         )
 
-        embed = discord.Embed()
-        embed.title = "`spawn tracking{}`".format(
-            " " + subcommand if subcommand else ""
+        server = self.bot.servers[target]
+        embed = discord.Embed(
+            title="`spawn tracking{}`".format(" " + subcommand if subcommand else ""),
+            description=spawn,
+            color=server.discord_color,
         )
-        embed.description = spawn
-        embed.set_footer(text=self.bot.servers[target].display_name)
+        embed.set_footer(text=server.display_name)
 
         return embed
 

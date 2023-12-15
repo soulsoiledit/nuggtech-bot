@@ -29,9 +29,11 @@ class TickWarp(commands.Cog):
         }
         status = replace_map(status, replace) + "**"
 
-        embed = discord.Embed(title="`/tick warp status`")
-        embed.description = status
-        embed.set_footer(text=self.bot.servers[target].display_name)
+        server = self.bot.servers[target]
+        embed = discord.Embed(
+            title="`/tick warp status`", description=status, color=server.discord_color
+        )
+        embed.set_footer(text=server.display_name)
 
         return embed
 

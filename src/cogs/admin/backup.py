@@ -56,10 +56,10 @@ class Backup(commands.Cog):
 
         embed = discord.Embed(
             title=f"Backups for {server.display_name}:",
-            color=server.discord_color,
             description=desc,
+            color=server.discord_color,
         )
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+        embed.set_footer(text=server.display_name)
 
         return embed
 
@@ -69,10 +69,10 @@ class Backup(commands.Cog):
 
         embed = discord.Embed(
             title=f"Backup result for {server.display_name}:",
-            color=server.discord_color,
             description=result.capitalize(),
+            color=server.discord_color,
         )
-        embed.set_footer(text="NuggTech", icon_url=self.bot.discord_config.avatar)
+        embed.set_footer(text=server.display_name)
 
         return embed
 
@@ -85,7 +85,7 @@ class Backup(commands.Cog):
     ):
         target = server.value
         await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, f"LIST_BACKUPS")
+        await bridge_send(self.bot.servers, target, "LIST_BACKUPS")
         await interaction.followup.send(embed=await self.handle_backup_list(target))
 
     @backup_commands.command(

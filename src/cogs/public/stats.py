@@ -118,17 +118,10 @@ else:
             stats = json.loads(stats.replace("\\", ""))["stats"]
             stats = sorted(stats.items(), reverse=True, key=lambda x: x[1][statistic])
 
-            server = self.bot.servers[target]
-
-            embed = discord.Embed()
-            embed.title = f"{STAT_MAPPING[statistic]} Leaderboard"
-
-            total = sum([s[1][statistic] for s in stats])
-            embed.description = f"**Total: {total:,}**"
-
             ranks = []
             players = []
             digs = []
+            total_digs = sum([stat[1][statistic] for stat in stats])
 
             leaderboard_length = -1 if full_leaderboard else 15
             for i, (player, stat) in enumerate(stats[:leaderboard_length]):
@@ -136,12 +129,17 @@ else:
                 players.append(str(player.replace("_", "\\_")))
                 digs.append(f"{stat[statistic]:,}")
 
+            server = self.bot.servers[target]
+            embed = discord.Embed(
+                title=f"{STAT_MAPPING[statistic]} Leaderboard",
+                color=server.discord_color,
+                description=f"**Total: {total_digs:,}**",
+            )
+            embed.set_footer(text=server.display_name)
+
             embed.add_field(name="Rank", value="\n".join(ranks))
             embed.add_field(name="Player", value="\n".join(players))
             embed.add_field(name="Digs", value="\n".join(digs))
-
-            embed.set_footer(text=server.display_name)
-            embed.color = server.discord_color
 
             return embed
 

@@ -37,15 +37,17 @@ class Profile(commands.Cog):
                 cleaned_health += f"{cleaned}\n"
 
         server = self.bot.servers[target]
-
-        embed = discord.Embed(title="`/profile health`")
-        embed.color = server.discord_color
-        embed.description = cleaned_health
-        embed.set_footer(text=self.bot.servers[target].display_name)
+        embed = discord.Embed(
+            title="`/profile health`",
+            description=cleaned_health,
+            color=server.discord_color,
+        )
+        embed.set_footer(text=server.display_name)
 
         return embed
 
     async def handle_profile_entities(self, target: str):
+        server = self.bot.servers[target]
         entities = await self.bot.profile_queue.get()
 
         cleaned_entities = ""
@@ -59,11 +61,12 @@ class Profile(commands.Cog):
                 cleaned_entities += f"{cleaned}\n"
 
         server = self.bot.servers[target]
-
-        embed = discord.Embed(title="`/profile entities`")
-        embed.color = server.discord_color
-        embed.description = cleaned_entities
-        embed.set_footer(text=self.bot.servers[target].display_name)
+        embed = discord.Embed(
+            title="`/profile entities`",
+            description=cleaned_entities,
+            color=server.discord_color,
+        )
+        embed.set_footer(text=server.display_name)
 
         return embed
 
