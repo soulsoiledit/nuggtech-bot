@@ -1,7 +1,11 @@
-from discord.ext import commands
-
-import os
 import json
+import typing
+
+# change to name of the tmux session
+SERVER_SHELL = "example"
+
+# change to absolute path of server directory
+SERVER_PATH = "/home/user/example"
 
 TOOLS = [
     "pickaxe",
@@ -19,7 +23,22 @@ DEFAULT_STATS = {
     "combined": 0,
 }
 
+LeaderboardChoices = typing.Literal[
+    "pickaxe", "shovel", "axe", "hoe", "total", "combined"
+]
+
+STAT_MAPPING = {
+    "pickaxe": "Pickaxe Uses",
+    "shovel": "Shovel Uses",
+    "axe": "Axe Uses",
+    "hoe": "Hoe Uses",
+    "total": "Total Tool Uses",
+    "combined": "Combined Blocks",
+}
+
 if __name__ == "__main__":
+    import os
+    import subprocess
 
     def get_tool_stats(data, totals):
         for item, uses in data["minecraft:used"].items():
@@ -33,16 +52,17 @@ if __name__ == "__main__":
     # eventually, we want to be able to send arbitrary statistics back to the bot
     def push_server_stats():
         # check that the server is whitelisted
-        if not os.path.isfile("./whitelist.json"):
+        whitelist_file = f"{SERVER_PATH}/whitelist.json"
+        if not os.path.isfile(whitelist_file):
             return
 
-        whitelist = json.load(open("./whitelist.json"))
+        whitelist = json.load(open(whitelist_file))
 
         player_stats = {}
         for player in whitelist:
             name = player["name"]
             uuid = player["uuid"]
-            stats_file = f"./world/stats/{uuid}.json"
+            stats_file = f"{SERVER_PATH}/world/stats/{uuid}.json"
 
             # check that player has a stats file
             if not os.path.isfile(stats_file):
@@ -64,42 +84,93 @@ if __name__ == "__main__":
 
             player_stats[name] = stat_totals
 
-        player_stats = json.dumps({"nuggcat-stats": player_stats})
+        player_stats = json.dumps({"stats": player_stats})
 
-        # send data to nuggcat...
-        player_stats = json.loads(player_stats)["nuggcat-stats"]
-        print(
-            sorted(player_stats.items(), reverse=True, key=lambda x: x[1]["combined"])
+        # send data to the tmux session...
+        subprocess.run(
+            [
+                "tmux",
+                "send-keys",
+                "-t",
+                SERVER_SHELL,
+                player_stats,
+                "Enter",
+            ]
         )
-        print(sorted(player_stats.items(), reverse=True, key=lambda x: x[1]["total"]))
-        print(sorted(player_stats.items(), reverse=True, key=lambda x: x[1]["pickaxe"]))
 
     push_server_stats()
 else:
-    import bot
+    import discord
+    from discord import app_commands
+    from discord.ext import commands
 
-    def func():
-        pass
-        # ...receive data from server
-        # received_data = player_stats
-        # received_data = json.loads(player_stats)["nuggcat-stats"]
-        # mode = "total"
-        #
-        # data_sorted = sorted(
-        #     received_data.items(), key=lambda data: data[1][mode], reverse=True
-        # )
-        #
-        # # sorted list
-        # for player, stats in data_sorted:
-        #     print(f"{player}: {stats[mode]}")
+    import bot
+    from bridge import bridge_send
 
     class Statistics(commands.Cog):
         def __init__(self, bot: bot.PropertyBot):
             self.bot = bot
 
-        # @app_commands.command(description="show stats")
-        # async def stats(self, interaction: discord.Interaction):
-        #     await interaction.response.send_message(stats)
+        async def handle_stats(
+            self, target: str, statistic: str, full_leaderboard: bool
+        ):
+            stats = await self.bot.response_queue.get()
+            stats = json.loads(stats.replace("\\", ""))["stats"]
+            stats = sorted(stats.items(), reverse=True, key=lambda x: x[1][statistic])
+
+            server = self.bot.servers[target]
+
+            embed = discord.Embed()
+            embed.title = f"{STAT_MAPPING[statistic]} Leaderboard"
+
+            total = sum([s[1][statistic] for s in stats])
+            embed.description = f"**Total: {total:,}**"
+
+            ranks = []
+            players = []
+            digs = []
+
+            leaderboard_length = -1 if full_leaderboard else 15
+            for i, (player, stat) in enumerate(stats[:leaderboard_length]):
+                ranks.append(str(i + 1))
+                players.append(str(player.replace("_", "\\_")))
+                digs.append(f"{stat[statistic]:,}")
+
+            embed.add_field(name="Rank", value="\n".join(ranks))
+            embed.add_field(name="Player", value="\n".join(players))
+            embed.add_field(name="Digs", value="\n".join(digs))
+
+            embed.set_footer(text=server.display_name)
+            embed.color = server.discord_color
+
+            return embed
+
+        @app_commands.command(
+            name="stats", description="show scoreboard for a statistic"
+        )
+        @app_commands.describe(server="target server")
+        @app_commands.choices(server=bot.server_choices)
+        @app_commands.describe(leaderboard="leaderboard to display")
+        @app_commands.describe(full="show all players")
+        async def stats(
+            self,
+            interaction: discord.Interaction,
+            server: app_commands.Choice[str],
+            leaderboard: LeaderboardChoices = "total",
+            full: bool = False,
+        ):
+            target = server.value
+            await interaction.response.defer()
+
+            await bridge_send(
+                self.bot.servers,
+                target,
+                "SHELL python3 scripts/stats.py",
+            )
+
+            await interaction.followup.send(
+                embed=await self.handle_stats(target, leaderboard, full)
+            )
 
     async def setup(bot: bot.PropertyBot):
         await bot.add_cog(Statistics(bot))
