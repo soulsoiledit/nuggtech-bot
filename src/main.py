@@ -1,4 +1,6 @@
-import logging, argparse
+import argparse
+import logging
+
 from bot import PropertyBot
 
 

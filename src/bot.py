@@ -1,4 +1,5 @@
-import logging, asyncio
+import logging
+import asyncio
 
 import discord
 from discord.ext import commands
@@ -18,6 +19,7 @@ for server in config.servers.values():
     server_choices.append(choice)
     if server.creative:
         creative_server_choices.append(choice)
+
 
 class PropertyBot(commands.Bot):
     def __init__(self) -> None:
@@ -43,7 +45,7 @@ class PropertyBot(commands.Bot):
             "member.carpet.spawn",
             "member.carpet.warp",
             "public.pet",
-            # "public.stats"
+            "public.stats",
         ]
 
         self.webhook: discord.Webhook
