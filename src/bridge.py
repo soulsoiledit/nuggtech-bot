@@ -1,10 +1,23 @@
-import re, logging, asyncio
+import asyncio
+import logging
+import re
+import json
 
-from websockets import client, exceptions
 import discord
+from websockets import client, exceptions
+
 
 class DiscordConfig:
-    def __init__(self, token, maintainer, bridge_channel, log_channel, avatar, name_color, reply_color) -> None:
+    def __init__(
+        self,
+        token,
+        maintainer,
+        bridge_channel,
+        log_channel,
+        avatar,
+        name_color,
+        reply_color,
+    ) -> None:
         self.token = token
 
         self.maintainer = maintainer
@@ -15,8 +28,11 @@ class DiscordConfig:
         self.name_color = name_color
         self.reply_color = reply_color
 
+
 class Server:
-    def __init__(self, name, ip, port, ws_password, display_name, nickname, color, creative) -> None:
+    def __init__(
+        self, name, ip, port, ws_password, display_name, nickname, color, creative
+    ) -> None:
         self.name = name
         self.ip = ip
         self.port = port
@@ -30,11 +46,13 @@ class Server:
 
         self.websocket: client.WebSocketClientProtocol | None = None
 
+
 ServersDict = dict[str, Server]
 
 logger = logging.getLogger("discord")
 
 ResponseQueue = asyncio.Queue[str]
+
 
 class BridgeData:
     def __init__(
@@ -132,6 +150,8 @@ async def process_response(bridge_data: BridgeData, server: Server, response: st
                 await handle_join_leave(bridge_data, server, join_msg)
             elif re.search(r"Average tick time|Top 10 counts", message):
                 await bridge_data.profile_queue.put(response)
+            elif stats_msg := re.search(r"({\\\"stats\\\".*)<--.*", message):
+                await bridge_data.response_queue.put(stats_msg.group(1))
             else:
                 logger.warn(f"Unhandled! {server.name} {message}")
         case "RCON":
@@ -153,9 +173,10 @@ async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match
     username = matches.group(1).replace("\\", "")
     message = matches.group(2).replace("\\", "")
 
-    avatar = f"https://mc-heads.net/head/{username}.png"
-    if " " in avatar:
-        avatar = f"https://mc-heads.net/head/steve.png"
+    if " " in username:
+        avatar = "https://mc-heads.net/head/steve.png"
+    else:
+        avatar = f"https://mc-heads.net/head/{username}.png"
 
     await bridge_data.webhook.send(message, username=username, avatar_url=avatar)
 
