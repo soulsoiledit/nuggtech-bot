@@ -76,6 +76,14 @@
   - Public
     - Pet the NuggCat
     - Show player statistics from SMP
+      - Use shell script and tmux to push input to taurus
 
-# Bugs
+# Todo
+- Echo player join to other servers
+
 - Add help command and readme documentation
+
+- Separate queues into per server and per command
+  - Use helper function to sort output type
+
+- Improve text normalization
