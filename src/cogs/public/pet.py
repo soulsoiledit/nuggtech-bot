@@ -36,14 +36,6 @@ class Pet(commands.Cog):
 
         await interaction.response.send_message(meowsage)
 
-    @pet.error
-    async def pet_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, discord.app_commands.CommandOnCooldown):
-            retry_period = round(error.retry_after)
-            await interaction.response.send_message(
-                f">w< try petting again after {retry_period}s...!", ephemeral=True
-            )
-
 
 async def setup(bot: bot.PropertyBot):
     await bot.add_cog(Pet(bot))
