@@ -69,6 +69,12 @@ class BridgeData:
         self.profile_queue = profile_queue
 
 
+class Reply:
+    def __init__(self, user, message) -> None:
+        self.user = user
+        self.message = message
+
+
 # Setup connections to all configured servers
 async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
     async with asyncio.TaskGroup() as tg:
@@ -82,27 +88,29 @@ async def setup_connection(
 ) -> None:
     try:
         if server.websocket:
-            logger.info(f"Websocket already setup for {server.name}")
+            logger.info(f"Found existing connection to {server.name}")
+
             if close_existing:
                 await server.websocket.close()
-                logger.info(f"Existing connection for {server.name} closed!")
+                logger.info(f"Existing connection to {server.name} closed!")
             else:
                 return
 
         logger.info(f"Attempting connection to {server.name}...")
         url = "ws://{}:{}/taurus".format(server.ip, server.port)
-        websocket = await client.connect(url, ping_timeout=30)
+        websocket = await client.connect(url)
         await websocket.send(server.ws_pass)
+
         server.websocket = websocket
         logger.info(f"Connected to {server.name}!")
 
-        await bridge_listen(bridge_data, server)
+        await setup_listener(bridge_data, server)
     except ConnectionRefusedError:
-        logger.warn(f"Failed to connect to {server.name}")
+        logger.warn(f"Failed to connect to {server.name}!")
 
 
 # Listen for messages from websocket and handle closed connections
-async def bridge_listen(bridge_data: BridgeData, server: Server):
+async def setup_listener(bridge_data: BridgeData, server: Server):
     try:
         if server.websocket:
             logger.info(f"Starting listener for {server.name}...")
@@ -123,18 +131,13 @@ async def bridge_send(servers: ServersDict, target: str, command: str):
         await websocket.send(command)
 
 
-async def bridge_rcon(servers: ServersDict, target: str, command: str):
-    websocket = servers[target].websocket
-    if websocket:
-        await websocket.send(command)
-
-
 async def bridge_chat(servers: ServersDict, source: str | None, message):
     for server in servers.keys():
         if server != source:
             await bridge_send(servers, server, f"RCON {server} {message}")
 
 
+# needs serious restructuring
 async def process_response(bridge_data: BridgeData, server: Server, response: str):
     logger.info(f"RESPONSE: {response}")
     split_response = response.split(maxsplit=1)
@@ -216,7 +219,7 @@ async def create_tellraw(
     source: str,
     username: str,
     message: str,
-    reply: tuple[str, str] | None,
+    reply: Reply | None,
 ):
     tellraw_cmd = ""
 
@@ -231,8 +234,8 @@ async def create_tellraw(
 
     if reply is not None:
         tellraw_cmd = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},"\\n",{{"text":"[{}] {}: {}","color":"{}"}}]'.format(
-            reply[0],
-            await clear_formatting(reply[1]),
+            reply.user,
+            await clear_formatting(reply.message),
             discord_config.reply_color,
             source_name,
             username,

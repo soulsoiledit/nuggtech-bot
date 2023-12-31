@@ -36,7 +36,6 @@ class PropertyBot(commands.Bot):
             "admin.backup",
             "member.info",
             "member.carpet.counter",
-            # "member.carpet.lifetime",
             # "member.carpet.player",
             # "member.carpet.tick",
             "member.carpet.profile",
@@ -58,12 +57,16 @@ class PropertyBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await super().setup_hook()
-        await self.load_cogs()
+
+        for extension in self.init_extensions:
+            await self.load_extension("cogs." + extension)
+            logger.info(f"Loaded {extension}!")
 
         bridge_channel = await self.fetch_channel(self.discord_config.bridge_channel)
-        if bridge_channel and isinstance(bridge_channel, discord.TextChannel):
+        if isinstance(bridge_channel, discord.TextChannel):
             if len(await bridge_channel.webhooks()) == 0:
                 await bridge_channel.create_webhook(name="chatbridge")
+
             self.webhook = (await bridge_channel.webhooks())[0]
 
         logger.info("Webhook setup!")
@@ -79,8 +82,10 @@ class PropertyBot(commands.Bot):
 
     async def on_message(self, msg: discord.Message):
         in_bridge_channel = msg.channel.id == self.discord_config.bridge_channel
-        is_real_user = not msg.author.bot and isinstance(msg.author, discord.Member)
-        if in_bridge_channel and is_real_user:
+        is_guild_member = isinstance(msg.author, discord.Member)
+        is_not_bot = not msg.author.bot
+
+        if in_bridge_channel and is_guild_member and is_not_bot:
             username = msg.author.name
             message = msg.clean_content
 
@@ -89,20 +94,19 @@ class PropertyBot(commands.Bot):
 
             # Handle replies
             reply = msg.reference
-            reply_user = None
             reply_message = None
 
-            reply_tuple = None
-            if reply:
-                reply = reply.resolved
-                if isinstance(reply, discord.Message):
-                    reply_user = reply.author.name
-                    reply_message = reply.clean_content
+            reply_structure = None
+            reply_exists = isinstance(reply, discord.MessageReference)
+            if reply_exists and isinstance(reply.resolved, discord.Message):
+                resolved_reply = reply.resolved
+                reply_message = resolved_reply.clean_content
+                if resolved_reply.attachments:
+                    reply_message += " [ATT]"
 
-                    if reply.attachments:
-                        reply_message += " [ATT]"
-
-                    reply_tuple = (reply_user, reply_message)
+                reply_structure = bridge.Reply(
+                    resolved_reply.author.name, reply_message
+                )
 
             tellraw_cmd = await bridge.create_tellraw(
                 self.discord_config,
@@ -110,15 +114,12 @@ class PropertyBot(commands.Bot):
                 "Discord",
                 username,
                 message,
-                reply_tuple,
+                reply_structure,
             )
+
             await bridge.bridge_chat(self.servers, None, tellraw_cmd)
 
-    async def load_cogs(self, reloading=False):
+    async def reload_cogs(self):
         for extension in self.init_extensions:
-            if reloading:
-                await self.reload_extension("cogs." + extension)
-                logger.info(f"Reloaded {extension}!")
-            else:
-                await self.load_extension("cogs." + extension)
-                logger.info(f"Loaded {extension}!")
+            await self.reload_extension("cogs." + extension)
+            logger.info(f"Reloaded {extension}!")
