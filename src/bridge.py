@@ -230,21 +230,21 @@ async def create_tellraw(
         color = servers[source].color
 
     if reply is not None:
-        tellraw_cmd = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},{{"text":"\\n"}},{{"text":"[{}] {}:","color":"{}"}},{{"text":" {}"}}]'.format(
+        tellraw_cmd = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},"\\n",{{"text":"[{}] {}: {}","color":"{}"}}]'.format(
             reply[0],
             await clear_formatting(reply[1]),
             discord_config.reply_color,
             source_name,
             username,
-            color,
             await clear_formatting(message),
+            color,
         )
     else:
-        tellraw_cmd = 'tellraw @a ["",{{"text":"[{}] {}: ","color":"{}"}},{{"text":"{}"}}]'.format(
+        tellraw_cmd = 'tellraw @a {{"text":"[{}] {}: {}","color":"{}"}}'.format(
             source_name,
             username,
-            color,
             await clear_formatting(message),
+            color,
         )
 
     return tellraw_cmd
