@@ -194,10 +194,15 @@ async def handle_join_leave(
     bot_username = source_server.display_name
     location = source_server.nickname
 
-    message = f"*{username} {action} the {location}!*"
+    message = f"{username} {action} the {location}!"
     await bridge_data.webhook.send(
-        message, username=bot_username, avatar_url=bridge_data.config.avatar
+        f"*{message}*", username=bot_username, avatar_url=bridge_data.config.avatar
     )
+
+    tellraw_cmd = 'tellraw @a {{"text":"{}","color":"{}"}}'.format(
+        await clear_formatting(message), source_server.color
+    )
+    await bridge_chat(bridge_data.servers, source_server.name, tellraw_cmd)
 
 
 async def clear_formatting(message):
