@@ -1,1 +1,1 @@
-uhhhhhh this is a discord bot i think
+A Discord bot and chatbridge for NuggTech TMC Server
