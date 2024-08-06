@@ -176,9 +176,9 @@ async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match
     message = matches.group(2).replace("\\", "")
 
     if " " in username:
-        avatar = "https://mc-heads.net/head/steve.png"
+        avatar = "https://mc-heads.net/head/steve"
     else:
-        avatar = f"https://mc-heads.net/head/{username}.png"
+        avatar = f"https://mc-heads.net/head/{username}"
 
     await bridge_data.webhook.send(message, username=username, avatar_url=avatar)
 
