@@ -27,7 +27,7 @@ class Debug(commands.Cog):
     async def perform_sync_op(self, guild: discord.Guild, operation) -> str:
         output = ""
         match operation:
-            case "quick":
+            case "guild":
                 await self.bot.tree.sync(guild=guild)
                 output = "Synced guild commands"
             case "copy":
@@ -48,7 +48,7 @@ class Debug(commands.Cog):
     async def text_sync(
         self,
         ctx: commands.Context,
-        operation: Literal["quick", "copy", "clear", "global"],
+        operation: Literal["guild", "copy", "clear", "global"],
     ):
         if ctx.author.id == self.bot.discord_config.maintainer:
             await ctx.message.delete()
