@@ -1,9 +1,9 @@
-import logging
 import asyncio
+import logging
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
 import bridge
 import config
@@ -118,6 +118,8 @@ class PropertyBot(commands.Bot):
             )
 
             await bridge.bridge_chat(self.servers, None, tellraw_cmd)
+
+        await self.process_commands(msg)
 
     async def reload_cogs(self):
         for extension in self.init_extensions:
