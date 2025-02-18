@@ -1,19 +1,14 @@
-[tool.poetry]
+[project]
 name = "nuggtech-bot"
 version = "0.2.0"
-description = "A Discord bot and chatbridge for the NuggTech TMC server"
-authors = ["Soi <soulsoill@proton.me>"]
+description = "A Discord bot and chatbridge for TMC servers"
+authors = ["Soi <no.sleep410@passinbox.com>"]
 readme = "README.md"
-license = "MIT"
-packages = [{ include = "src" }]
+requires-python = ">=3.12"
+dependencies = [
+    "discord-py>=2.4.0",
+    "websockets>=14.1",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-discord-py = "^2.3.2"
-websockets = "^12.0"
-setuptools = "^69.1.0"
-mcdreforged = "^2.12.3"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.ruff]
+indent-width = 2
