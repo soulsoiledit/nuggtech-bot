@@ -1,41 +1,31 @@
+import math
+import random
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-import math
-import bot
-import random
+from bot import NuggTechBot
 
 
 class Pet(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
 
-    @app_commands.command(description="pet the nuggcat")
-    async def pet(self, interaction: discord.Interaction):
-        meowlen = -1
-        meowchars = -1
+  @app_commands.command(description="pet nuggcat")
+  async def pet(self, inter: discord.Interaction):
+    length = round(random.uniform(0, 7.0), 1)
+    if length == 0.0:
+      meowsage = "Mw! (1 ns)"
+      pass
+    else:
+      if length == 7.0:
+        length = 7.0 + abs(random.gauss(0, 10))
+      chars = math.ceil(length)
+      meowsage = "Me{}w! ({} s)".format("o" * chars, length)
 
-        if random.random() < 0.01:
-            meowlen = random.gauss(10, 10)
-            if meowlen <= 10:
-                meowlen = 0
-                meowchars = -1
-            else:
-                meowchars = round(meowlen)
-                meowlen = round(meowlen, 1)
-        else:
-            meowlen = round(random.randint(1, 69) / 10, 1)
-            meowchars = math.floor(meowlen)
-
-        meowsage = ""
-        if meowlen == 0:
-            meowsage = "Mw! (1 ns)"
-        else:
-            meowsage = "Me{}w! ({} s)".format("o" * meowchars, meowlen)
-
-        await interaction.response.send_message(meowsage)
+    await inter.response.send_message(meowsage)
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(Pet(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(Pet(bot))
