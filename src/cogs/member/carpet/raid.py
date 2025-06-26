@@ -1,79 +1,61 @@
 from typing import Literal
-
-import discord
+from discord import Embed, Interaction
+from discord.app_commands import command
 from discord.ext import commands
-from discord import app_commands
 
-import bot
-from bridge import bridge_send
-
-TrackingSubcommand = Literal["start", "stop", "restart"] | None
+from bot import NuggTechBot, Servers
 
 
 class RaidTracking(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
 
-    async def handle_raid_tracking(
-        self, target: str, subcommand: TrackingSubcommand
-    ) -> discord.Embed:
-        raid = await self.bot.response_queue.get()
-        # Remove unnecessary break
-        raid = raid.replace("----------- Raid Tracker -----------\n", "")
-        # Format into bulleted list
-        raid = raid.replace("- ", "\n- ").replace("/h)Raiders", "/h)\nRaiders")
-        # Bold important text
-        raid = raid.replace("Tracked", "**Tracked").replace(
-            "(in game)", "(in game)**\n"
-        )
-        raid = raid.replace(
-            "Reasons for invalidation:", "\n**Reasons for invalidation:**"
-        )
-        raid = raid.replace("\nRaid gen", "\n**Raid gen").replace(
-            "\nRaiders:", "\n**Raiders:"
-        )
-        raid = raid.replace("/h)\n", "/h)**\n")
-        # Bold when spawn tracking stops or starts
-        raid = raid.replace("Raid Tracker", "\n**Raid Tracker")
-        raid = (
-            raid.replace("started", "started**")
-            .replace("stopped", "stopped**")
-            .replace("running", "running**")
-        )
+  @command(name="raidtracking", description="/raid tracking")
+  async def spawn_tracking(
+    self,
+    inter: Interaction,
+    server: Servers,
+    action: Literal["start", "stop", "restart"] | None,
+  ):
+    await inter.response.defer()
 
-        server = self.bot.servers[target]
-        embed = discord.Embed(
-            title="`/raid tracking{}`".format(" " + subcommand if subcommand else ""),
-            description=raid,
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
+    bridge, server_ = server.value
 
-        return embed
+    command_ = f"RCON {server_} raid tracking"
+    if action:
+      command_ += " {subcommand}"
 
-    @app_commands.command(
-        name="raidtracking", description="send /raid tracking {option}"
+    raid = await bridge.sendr(command_)
+
+    # TODO: update formatting
+    raid = (
+      # Remove unnecessary break
+      raid.replace("----------- Raid Tracker -----------\n", "")
+      # Format into bulleted list
+      .replace("- ", "\n- ")
+      .replace("/h)Raiders", "/h)\nRaiders")
+      # Bold important text
+      .replace("Tracked", "**Tracked")
+      .replace("(in game)", "(in game)**\n")
+      .replace("Reasons for invalidation:", "\n**Reasons for invalidation:**")
+      .replace("\nRaid gen", "\n**Raid gen")
+      .replace("\nRaiders:", "\n**Raiders:")
+      .replace("/h)\n", "/h)**\n")
+      # Bold when spawn tracking stops or starts
+      .replace("Raid Tracker", "\n**Raid Tracker")
+      .replace("started", "started**")
+      .replace("stopped", "stopped**")
+      .replace("running", "running**")
     )
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def spawn_tracking(
-        self,
-        interaction: discord.Interaction,
-        server: app_commands.Choice[str],
-        subcommand: TrackingSubcommand,
-    ):
-        target = server.value
-        await interaction.response.defer()
-        if subcommand:
-            await bridge_send(
-                self.bot.servers, target, f"RCON {target} raid tracking {subcommand}"
-            )
-        else:
-            await bridge_send(self.bot.servers, target, f"RCON {target} raid tracking")
-        await interaction.followup.send(
-            embed=await self.handle_raid_tracking(target, subcommand)
-        )
+
+    await inter.followup.send(
+      embed=Embed(
+        title=f"`/{command_}`",
+        description=raid,
+        color=server_.color,
+      ).set_footer(text=server_.display)
+    )
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(RaidTracking(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(RaidTracking(bot))
