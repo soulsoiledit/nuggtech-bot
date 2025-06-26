@@ -132,7 +132,8 @@ class NuggTechBot(commands.Bot):
 
     tellraw = json.dumps(
       [
-        self.normalize_discord(f"{user} {action} "),
+        self.normalize_discord(f"{user} {action}"),
+        " ",
         {
           "text": source.joinname,
           "color": str(source.color),
