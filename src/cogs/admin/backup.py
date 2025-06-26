@@ -1,107 +1,84 @@
-import discord
-from discord import app_commands
+from discord import Embed, Interaction
+from discord.app_commands import command, default_permissions
 from discord.ext import commands
 
 import bot
-from bridge import bridge_send
+from bot import NuggTechBot, Servers
+
+# taurus has awful conversions...
+KB = 1000.0
+MB = 1000000.0
+MiB = 1048576.0
+GiB = 1073741824.0
 
 
-class Backup(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+@default_permissions()
+class Backup(commands.GroupCog):
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
+    self.description: str = "manage backups"
 
-    backup_commands = app_commands.Group(name="backup", description="backup commands")
+  @command(description="manage backups")
+  @default_permissions()
+  async def create(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+    bridge, server_ = server.value
+    response = await bridge.sendr(f"BACKUP {server_}")
+    await inter.followup.send(response.capitalize())
 
-    async def handle_backup_list(self, target: str) -> discord.Embed:
-        server = self.bot.servers[target]
-        backup_list = await self.bot.response_queue.get()
+  @command(description="list backups")
+  async def list(self, inter: Interaction, server: Servers, full: bool = False):
+    await inter.response.defer()
 
-        desc = ""
-        if backup_list:
-            total = 0
-            lines = 0
+    bridge, server_ = server.value
+    response = await bridge.sendr("LIST_BACKUPS")
 
-            for line in backup_list.replace("LIST_BACKUPS ", "").split("\n"):
-                name, size, unit = line.split()
-                size = float(size[1:])
-                unit = unit[:-1]
+    desc: list[str] = []
+    backups: list[float] = []
+    count = 0
+    for line in response.splitlines():
+      if not (full or line.startswith(server_.name)):
+        continue
 
-                match unit:
-                    case "B":
-                        total += size
-                    case "KiB":
-                        total += size * 2**10
-                    case "MiB":
-                        total += size * 2**20
-                    case "GiB":
-                        total += size * 2**30
+      _, size, unit = line.split()
+      size = float(size[1:])
+      unit = unit[:-1]
 
-                lines += 1
-                if lines < 11:
-                    desc += f"{name} ({size:.1f} {unit})\n"
+      match unit:
+        case "KiB":
+          mult = KB
+        case "MiB":
+          mult = MB
+        case "GiB":
+          mult = GiB
+        case _:
+          # if you have TiB, please seek help
+          mult = 1.0
 
-            if total < 2**10:
-                desc += f"\n**Total:** {total:.2f} B"
-            elif total < 2**20:
-                total /= 2**10
-                desc += f"\n**Total:** {total:.2f} KiB"
-            elif total < 2**30:
-                total /= 2**20
-                desc += f"\n**Total:** {total:.2f} MiB"
-            else:
-                total /= 2**30
-                desc += f"\n**Total:** {total:.2f} GiB"
-        else:
-            desc = "There are no backups!"
+      backups.append(size * mult)
+      count += 1
 
-        embed = discord.Embed(
-            title=f"Backups for {server.display_name}:",
-            description=desc,
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
+      if full or count <= 10:
+        desc.append(line)
 
-        return embed
+    total = sum(backups)
+    if total < GiB:
+      total /= MiB
+      desc.append(f"\n**Total:** {total:.2f} MiB")
+    else:
+      total /= GiB
+      desc.append(f"\n**Total:** {total:.2f} GiB")
 
-    async def handle_backup_create(self, target: str) -> discord.Embed:
-        server = self.bot.servers[target]
-        result = await self.bot.response_queue.get()
+    if not desc:
+      desc.append("No backups found")
 
-        embed = discord.Embed(
-            title=f"Backup result for {server.display_name}:",
-            description=result.capitalize(),
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
+    embed = Embed(
+      description="\n".join(desc),
+      color=server_.color,
+    ).set_footer(text=server_.display)
 
-        return embed
-
-    @backup_commands.command(name="list", description="Lists backups of a server")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def list_backups(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, "LIST_BACKUPS")
-        await interaction.followup.send(embed=await self.handle_backup_list(target))
-
-    @backup_commands.command(
-        name="create", description="Creates a backups for a server"
-    )
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def create_backup(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, f"BACKUP {target}")
-        await interaction.followup.send(embed=await self.handle_backup_create(target))
+    await inter.followup.send(embed=embed)
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(Backup(bot))
+async def setup(bot: bot.NuggTechBot):
+  await bot.add_cog(Backup(bot))
