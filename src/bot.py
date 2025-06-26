@@ -113,15 +113,14 @@ class NuggTechBot(commands.Bot):
     await self.webhook.send(message, username=author, avatar_url=avatar)
 
     tellraw = json.dumps(
-      {
-        "text": "",
-        "color": str(response.server.color),
-        "extra": [
-          f"[{response.server.display}] ",
-          f"{author}: ",
-          message,
-        ],
-      }
+      [
+        "",
+        {
+          "text": f"[{response.server.display}]",
+          "color": str(response.server.color),
+        },
+        f" {author}: {message}",
+      ]
     )
 
     await self.relay(response.server, tellraw)
@@ -129,19 +128,21 @@ class NuggTechBot(commands.Bot):
   async def handle_join_leave(self, source: Server, matches: re.Match[str]):
     user, action = matches.groups()
 
-    message = f"{user} {action} {source.joinname}!"
-
     await self.webhook.send(
-      f"*{message}*",
+      f"*{user} {action} {source.joinname}!*",
       username=source.display,
       avatar_url=self.config.avatar,
     )
 
     tellraw = json.dumps(
-      {
-        "text": self.normalize_discord(message),
-        "color": str(source.color),
-      }
+      [
+        self.normalize_discord(f"{user} {action} "),
+        {
+          "text": source.joinname,
+          "color": str(source.color),
+        },
+        "!",
+      ]
     )
 
     await self.relay(source, tellraw)
@@ -160,36 +161,27 @@ class NuggTechBot(commands.Bot):
     reply = self.create_reply(message)
     if reply is None:
       tellraw = (
-        {
-          "text": "",
-          "color": str(self.config.name_color),
-          "extra": [
-            "[Discord] ",
-            f"{message_.author}: ",
-            message_.content,
-          ],
-        },
+        [
+          "",
+          {
+            "text": "[Discord]",
+            "color": str(self.config.name_color),
+          },
+          f" {message_.author}: {message_.content}",
+        ],
       )
     else:
       tellraw = [
+        "",
         {
-          "text": "",
+          "text": f"┌─{reply.author}: {reply.content}\n",
           "color": str(self.config.reply_color),
-          "extra": [
-            f"┌─{reply.author}: ",
-            reply.content,
-            "\n",
-          ],
         },
         {
-          "text": "",
+          "text": "[Discord]",
           "color": str(self.config.name_color),
-          "extra": [
-            "[Discord] ",
-            f"{message_.author}: ",
-            message_.content,
-          ],
         },
+        f" {message_.author}: {message_.content}",
       ]
 
     await self.relay(None, json.dumps(tellraw))
