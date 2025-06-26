@@ -1,253 +1,137 @@
-import asyncio
 import logging
 import re
+from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass, field
+from typing import NamedTuple, override
 
 import discord
-from websockets import client, exceptions
+from websockets.asyncio import client
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+from websockets.typing import Data
+
+logger = logging.getLogger("discord.nugg")
 
 
-class DiscordConfig:
-    def __init__(
-        self,
-        token,
-        maintainer,
-        bridge_channel,
-        log_channel,
-        avatar,
-        name_color,
-        reply_color,
-    ) -> None:
-        self.token = token
+class Config(NamedTuple):
+  token: str
 
-        self.maintainer = maintainer
-        self.bridge_channel = bridge_channel
-        self.log_channel = log_channel
+  bridge_channel: int
+  log_channel: int
 
-        self.avatar = avatar
-        self.name_color = name_color
-        self.reply_color = reply_color
+  avatar: str
+  name_color: discord.Color
+  reply_color: discord.Color
 
 
-class Server:
-    def __init__(
-        self, name, ip, port, ws_password, display_name, nickname, color, creative
-    ) -> None:
-        self.name = name
-        self.ip = ip
-        self.port = port
-        self.ws_pass = ws_password
+class Server(NamedTuple):
+  name: str
+  display: str
+  joinname: str
+  color: discord.Color
 
-        self.display_name = display_name
-        self.nickname = nickname
-        self.color = color
-        self.discord_color = discord.Color.from_str(self.color)
-        self.creative = creative
-
-        self.websocket: client.WebSocketClientProtocol | None = None
+  @override
+  def __str__(self) -> str:
+    return self.name
 
 
-ServersDict = dict[str, Server]
+class MSG(NamedTuple):
+  bridge: "Bridge"
+  server: "Server"
+  message: str
 
-logger = logging.getLogger("discord")
-
-ResponseQueue = asyncio.Queue[str]
-
-
-class BridgeData:
-    def __init__(
-        self,
-        config: DiscordConfig,
-        webhook: discord.Webhook,
-        servers: ServersDict,
-        response_queue: ResponseQueue,
-        profile_queue: ResponseQueue,
-    ) -> None:
-        self.config = config
-        self.webhook = webhook
-        self.servers = servers
-        self.response_queue = response_queue
-        self.profile_queue = profile_queue
-
-
-class Reply:
-    def __init__(self, user, message) -> None:
-        self.user = user
-        self.message = message
-
-
-# Setup connections to all configured servers
-async def setup_all_connections(bridge_data: BridgeData, close_existing=False):
-    async with asyncio.TaskGroup() as tg:
-        for server in bridge_data.servers.values():
-            tg.create_task(setup_connection(bridge_data, server, close_existing))
-
-
-# Setup connection to single server websocket and start listener
-async def setup_connection(
-    bridge_data: BridgeData, server: Server, close_existing=False
-) -> None:
-    try:
-        if server.websocket:
-            logger.info(f"Found existing connection to {server.name}")
-
-            if close_existing:
-                await server.websocket.close()
-                logger.info(f"Existing connection to {server.name} closed!")
-            else:
-                return
-
-        logger.info(f"Attempting connection to {server.name}...")
-        url = "ws://{}:{}/taurus".format(server.ip, server.port)
-        websocket = await client.connect(url)
-        await websocket.send(server.ws_pass)
-
-        server.websocket = websocket
-        logger.info(f"Connected to {server.name}!")
-
-        await setup_listener(bridge_data, server)
-    except ConnectionRefusedError:
-        logger.warn(f"Failed to connect to {server.name}!")
-
-
-# Listen for messages from websocket and handle closed connections
-async def setup_listener(bridge_data: BridgeData, server: Server):
-    try:
-        if server.websocket:
-            logger.info(f"Starting listener for {server.name}...")
-            async for response in server.websocket:
-                if isinstance(response, str):
-                    await process_response(bridge_data, server, response)
-    except exceptions.ConnectionClosedError as e:
-        server.websocket = None
-        logger.warn(f"Lost connection with {server.name} due to {e}")
-    except exceptions.ConnectionClosedOK:
-        server.websocket = None
-        logger.info(f"Closed connection with {server.name}")
-
-
-async def bridge_send(servers: ServersDict, target: str, command: str):
-    websocket = servers[target].websocket
-    if websocket:
-        await websocket.send(command)
-
-
-async def bridge_chat(servers: ServersDict, source: str | None, message):
-    for server in servers.keys():
-        if server != source:
-            await bridge_send(servers, server, f"RCON {server} {message}")
-
-
-# needs serious restructuring
-async def process_response(bridge_data: BridgeData, server: Server, response: str):
-    logger.info(f"RESPONSE: {response}")
-    split_response = response.split(maxsplit=1)
-
-    match split_response[0]:
-        case "MSG":
-            # Differentiate chat messages, join/leave, etc
-            message = response
-            if chat_msg := re.search(r"<(.*?)> (.*)$", message):
-                await handle_chat(bridge_data, server, chat_msg)
-            elif join_msg := re.search(r"\[.*\] (.*) (joined|left)", message):
-                await handle_join_leave(bridge_data, server, join_msg)
-            elif re.search(r"Average tick time|Top 10 counts", message):
-                await bridge_data.profile_queue.put(response)
-            elif stats_msg := re.search(r"({\\\"stats\\\".*)<--.*", message):
-                await bridge_data.response_queue.put(stats_msg.group(1))
-            else:
-                logger.warn(f"Unhandled! {server.name} {message}")
-        case "RCON":
-            if "No player was found" in response:
-                return
-            if len(split_response) > 1:
-                await bridge_data.response_queue.put(response.split(maxsplit=1)[1])
-            logger.info(f"RCON response from {server.name}!: {response}")
-        case "LIST_BACKUPS" | "BACKUP" | "LIST" | "CHECK" | "HEARTBEAT":
-            if len(split_response) == 1:
-                await bridge_data.response_queue.put("")
-            else:
-                await bridge_data.response_queue.put(response.split(maxsplit=1)[1])
-        case _:
-            logger.warn(f"Unhandled message type: {response}")
-
-
-async def handle_chat(bridge_data: BridgeData, source: Server, matches: re.Match):
-    username = matches.group(1).replace("\\", "")
-    message = matches.group(2).replace("\\", "")
-
-    if " " in username:
-        avatar = "https://mc-heads.net/head/steve"
-    else:
-        avatar = f"https://mc-heads.net/head/{username}"
-
-    await bridge_data.webhook.send(message, username=username, avatar_url=avatar)
-
-    tellraw_cmd = await create_tellraw(
-        bridge_data.config, bridge_data.servers, source.name, username, message, None
-    )
-    await bridge_chat(bridge_data.servers, source.name, tellraw_cmd)
-
-
-async def handle_join_leave(
-    bridge_data: BridgeData, source_server: Server, matches: re.Match
-):
-    username = matches.group(1)
-    action = matches.group(2)
-
-    bot_username = source_server.display_name
-    location = source_server.nickname
-
-    message = f"{username} {action} the {location}!"
-    await bridge_data.webhook.send(
-        f"*{message}*", username=bot_username, avatar_url=bridge_data.config.avatar
+  @override
+  def __str__(self) -> str:
+    return "{}@{}: {}".format(
+      self.server.name,
+      self.bridge.name,
+      self.message,
     )
 
-    tellraw_cmd = 'tellraw @a {{"text":"{}","color":"{}"}}'.format(
-        await clear_formatting(message), source_server.color
+
+@dataclass
+class Bridge:
+  name: str
+  ip: str
+  port: int
+  password: str
+  servers: list[Server]
+  websocket: client.ClientConnection | None = None
+
+  uri: str = field(init=False)
+  _servers: dict[str, Server] = field(init=False)
+
+  def __post_init__(self):
+    self.uri = f"ws://{self.ip}:{self.port}/taurus"
+    self._servers = {server.name: server for server in self.servers}
+
+  async def connect(self) -> AsyncGenerator[MSG]:
+    async for websocket in client.connect(self.uri):
+      await websocket.send(self.password)
+      self.websocket = websocket
+      logger.info(f"Connected to {self.name}")
+      try:
+        async for resp in websocket:
+          if parsed := self._parse(resp):
+            yield parsed
+      except ConnectionClosedOK:
+        logger.warning(f"Not connected to {self.name}!")
+      except ConnectionClosedError:
+        logger.warning(f"Lost connection with {self.name}!")
+      finally:
+        logger.info(f"Closed connection with {self.name}")
+
+  async def close(self):
+    if self.websocket:
+      await self.websocket.close()
+
+  async def send(self, message: str):
+    if self.websocket:
+      await self.websocket.send(message)
+
+  # starts a new connection to capture a specific response
+  # kinda wasteful..., but taurus makes it very hard otherwise
+  async def sendr(
+    self,
+    command: str,
+    accept: Callable[[str], bool] = lambda x: not x.startswith("MSG"),
+    delayed: bool = False,
+  ) -> str:
+    cmd = command.split(maxsplit=1)[0]
+    async for websocket in client.connect(self.uri):
+      await websocket.send(self.password)
+      await websocket.send(command)
+
+      async for response in websocket:
+        response = str(response)
+
+        # wait for second response
+        if delayed:
+          delayed = not response.startswith(cmd)
+          continue
+
+        if not accept(response):
+          continue
+
+        logger.debug(f"{self.name}: {response}")
+        sp = response.split(maxsplit=1)
+        if len(sp) == 1:
+          return ""
+        return sp[1]
+
+    return ""
+
+  def _parse(self, response: Data) -> MSG | None:
+    match = re.fullmatch(
+      r"^MSG \[(.*)\] (.*)$",
+      str(response),
     )
-    await bridge_chat(bridge_data.servers, source_server.name, tellraw_cmd)
 
+    if match is None:
+      return
+    server, message = match.groups()
 
-async def clear_formatting(message):
-    # Returns repr version of the string with quotes escaped properly
-    return repr(message)[1:-1].replace('"', '\\"')
-
-
-async def create_tellraw(
-    discord_config: DiscordConfig,
-    servers: ServersDict,
-    source: str,
-    username: str,
-    message: str,
-    reply: Reply | None,
-):
-    tellraw_cmd = ""
-
-    source_name = None
-    color = None
-    if source == "Discord":
-        source_name = source
-        color = discord_config.name_color
-    else:
-        source_name = servers[source].display_name
-        color = servers[source].color
-
-    if reply is not None:
-        tellraw_cmd = 'tellraw @a ["",{{"text":"┌─ {}: {}","color":"{}"}},"\\n",{{"text":"[{}] {}: {}","color":"{}"}}]'.format(
-            reply.user,
-            await clear_formatting(reply.message),
-            discord_config.reply_color,
-            source_name,
-            username,
-            await clear_formatting(message),
-            color,
-        )
-    else:
-        tellraw_cmd = 'tellraw @a {{"text":"[{}] {}: {}","color":"{}"}}'.format(
-            source_name,
-            username,
-            await clear_formatting(message),
-            color,
-        )
-
-    return tellraw_cmd
+    return MSG(
+      self,
+      self._servers[server],
+      message,
+    )

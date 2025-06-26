@@ -1,127 +1,249 @@
 import asyncio
+import json
 import logging
+import re
+from asyncio import Task, create_task
+from enum import Enum
+from typing import NamedTuple, cast, override
 
 import discord
-from discord import app_commands
+from discord import TextChannel
 from discord.ext import commands
 
-import bridge
-import config
+from bridge import MSG, Bridge, Config, Server
+from config import bridges, config
 
-logger = logging.getLogger("discord")
-
-server_choices = []
-creative_server_choices = []
-
-for server in config.servers.values():
-    choice = app_commands.Choice(name=server.display_name, value=server.name)
-
-    server_choices.append(choice)
-    if server.creative:
-        creative_server_choices.append(choice)
+logger = logging.getLogger("discord.nugg")
 
 
-class PropertyBot(commands.Bot):
-    def __init__(self) -> None:
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.guilds = True
-        super().__init__(command_prefix="$$", intents=intents)
+# definitely not how enum should be used...
+class _Servers(Enum):
+  @property
+  @override
+  def value(self) -> tuple[Bridge, Server]:
+    return cast(tuple[Bridge, Server], self._value_)
 
-        self.init_extensions = [
-            "maintainer.debug",
-            "admin.manage",
-            "admin.whitelist",
-            "admin.rcon",
-            "admin.backup",
-            "member.info",
-            "member.carpet.counter",
-            # "member.carpet.player",
-            # "member.carpet.tick",
-            "member.carpet.profile",
-            "member.carpet.raid",
-            "member.carpet.scounter",
-            "member.carpet.spawn",
-            "member.carpet.warp",
-            "public.pet",
-            "public.stats",
-        ]
 
-        self.webhook: discord.Webhook
+_servers = {
+  server.display: (bridge, server) for bridge in bridges for server in bridge.servers
+}
+Servers = _Servers("Servers", _servers)
 
-        self.discord_config: bridge.DiscordConfig = config.discord_config
-        self.servers: bridge.ServersDict = config.servers
+extensions = [
+  "admin.debug",
+  "admin.manage",
+  "admin.rcon",
+  "admin.whitelist",
+  "admin.backup",
+  "member.info",
+  "member.carpet.counter",
+  # TODO: "member.carpet.player",
+  "member.carpet.profile",
+  "member.carpet.raid",
+  "member.carpet.spawn",
+  "member.carpet.tick",
+  "public.pet",
+  "public.stat",
+]
 
-        self.response_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
-        self.profile_queue: bridge.ResponseQueue = asyncio.Queue(maxsize=1)
 
-    async def setup_hook(self) -> None:
-        await super().setup_hook()
+class Message(NamedTuple):
+  author: str
+  content: str
 
-        for extension in self.init_extensions:
-            await self.load_extension("cogs." + extension)
-            logger.info(f"Loaded {extension}!")
 
-        bridge_channel = await self.fetch_channel(self.discord_config.bridge_channel)
-        if isinstance(bridge_channel, discord.TextChannel):
-            if len(await bridge_channel.webhooks()) == 0:
-                await bridge_channel.create_webhook(name="chatbridge")
+class NuggTechBot(commands.Bot):
+  def __init__(self) -> None:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    super().__init__(command_prefix="$$", intents=intents)
 
-            self.webhook = (await bridge_channel.webhooks())[0]
+    self.webhook: discord.Webhook
 
-        logger.info("Webhook setup!")
+    self.config: Config = config
+    self.bridges: list[Bridge] = bridges
+    self.connect_task: Task[None]
 
-        bridge_data = bridge.BridgeData(
-            self.discord_config,
-            self.webhook,
-            self.servers,
-            self.response_queue,
-            self.profile_queue,
-        )
-        asyncio.create_task(bridge.setup_all_connections(bridge_data))
+  @override
+  async def setup_hook(self) -> None:
+    await super().setup_hook()
+    await self.load_cogs()
+    await self.set_webhook()
 
-    async def on_message(self, msg: discord.Message):
-        in_bridge_channel = msg.channel.id == self.discord_config.bridge_channel
-        is_guild_member = isinstance(msg.author, discord.Member)
-        is_not_bot = not msg.author.bot
+    # start all bridges
+    self.connect_task = create_task(self.connect_bridges())
 
-        if in_bridge_channel and is_guild_member and is_not_bot:
-            username = msg.author.name
-            message = msg.clean_content
+  # TODO: investigate having a more central processor
+  # currently has 1 for each bridge
+  async def process(self, bridge: Bridge):
+    async for resp in bridge.connect():
+      msg = self.normalize_mc(resp.message)
+      if chat := re.search(r"<(.*?)> (.*)$", msg):
+        logger.info(msg)
+        await self.handle_chat(resp, chat)
+      elif join := re.search(r"(.*) (joined|left)", msg):
+        logger.info(msg)
+        await self.handle_join_leave(resp.server, join)
 
-            if msg.attachments:
-                message += " [ATT]"
+  async def connect_bridges(self):
+    async with asyncio.TaskGroup() as tg:
+      for bridge in self.bridges:
+        _ = tg.create_task(self.process(bridge))
 
-            # Handle replies
-            reply = msg.reference
-            reply_message = None
+  async def close_bridges(self):
+    async with asyncio.TaskGroup() as tg:
+      for bridge in self.bridges:
+        _ = tg.create_task(bridge.close())
 
-            reply_structure = None
-            reply_exists = isinstance(reply, discord.MessageReference)
-            if reply_exists and isinstance(reply.resolved, discord.Message):
-                resolved_reply = reply.resolved
-                reply_message = resolved_reply.clean_content
-                if resolved_reply.attachments:
-                    reply_message += " [ATT]"
+  async def relay(self, target: Server | None, msg: str):
+    async with asyncio.TaskGroup() as tg:
+      for bridge in self.bridges:
+        for server in bridge.servers:
+          if server is not target:
+            _ = tg.create_task(bridge.send(f"RCON {server.name} tellraw @a {msg}"))
 
-                reply_structure = bridge.Reply(
-                    resolved_reply.author.name, reply_message
-                )
+  async def handle_chat(self, response: MSG, chat: re.Match[str]):
+    author, message = chat.groups()
 
-            tellraw_cmd = await bridge.create_tellraw(
-                self.discord_config,
-                self.servers,
-                "Discord",
-                username,
-                message,
-                reply_structure,
-            )
+    if " " in author:
+      avatar = "https://mc-heads.net/head/steve"
+    else:
+      avatar = f"https://mc-heads.net/head/{author}"
 
-            await bridge.bridge_chat(self.servers, None, tellraw_cmd)
+    await self.webhook.send(message, username=author, avatar_url=avatar)
 
-        await self.process_commands(msg)
+    tellraw = json.dumps(
+      {
+        "text": "",
+        "color": str(response.server.color),
+        "extra": [
+          f"[{response.server.display}] ",
+          f"{author}: ",
+          message,
+        ],
+      }
+    )
 
-    async def reload_cogs(self):
-        for extension in self.init_extensions:
-            await self.reload_extension("cogs." + extension)
-            logger.info(f"Reloaded {extension}!")
+    await self.relay(response.server, tellraw)
+
+  async def handle_join_leave(self, source: Server, matches: re.Match[str]):
+    user, action = matches.groups()
+
+    message = f"{user} {action} {source.joinname}!"
+
+    await self.webhook.send(
+      f"*{message}*",
+      username=source.display,
+      avatar_url=self.config.avatar,
+    )
+
+    tellraw = json.dumps(
+      {
+        "text": self.normalize_discord(message),
+        "color": str(source.color),
+      }
+    )
+
+    await self.relay(source, tellraw)
+
+  @override
+  async def on_message(self, message: discord.Message):
+    await super().on_message(message)
+
+    if message.channel.id != self.config.bridge_channel:
+      return
+
+    if message.author.bot:
+      return
+
+    message_ = self.create_message(message)
+    reply = self.create_reply(message)
+    if reply is None:
+      tellraw = (
+        {
+          "text": "",
+          "color": str(self.config.name_color),
+          "extra": [
+            "[Discord] ",
+            f"{message_.author}: ",
+            message_.content,
+          ],
+        },
+      )
+    else:
+      tellraw = [
+        {
+          "text": "",
+          "color": str(self.config.reply_color),
+          "extra": [
+            f"┌─{reply.author}: ",
+            reply.content,
+            "\n",
+          ],
+        },
+        {
+          "text": "",
+          "color": str(self.config.name_color),
+          "extra": [
+            "[Discord] ",
+            f"{message_.author}: ",
+            message_.content,
+          ],
+        },
+      ]
+
+    await self.relay(None, json.dumps(tellraw))
+
+  async def load_cogs(self):
+    for ext in extensions:
+      name = f"cogs.{ext}"
+      try:
+        await self.load_extension(name)
+      except commands.ExtensionAlreadyLoaded:
+        await self.reload_extension(name)
+      logger.debug(f"Loaded {ext}")
+
+    logger.info("Loaded extensions")
+
+  async def set_webhook(self):
+    channel = await self.fetch_channel(self.config.bridge_channel)
+    if not isinstance(channel, TextChannel):
+      raise TypeError("Bridge channel incorrectly configured")
+
+    webhooks = await channel.webhooks()
+    for webhook in webhooks:
+      if webhook.name == "ngb-chatbridge":
+        self.webhook = webhook
+        break
+    else:
+      self.webhook = await channel.create_webhook(name="ngb-chatbridge")
+
+    logger.info("Webhook setup!")
+
+  async def log(self, message: str):
+    channel = await self.fetch_channel(self.config.log_channel)
+    if not isinstance(channel, TextChannel):
+      raise TypeError("Log channel incorrectly configured")
+    _ = await channel.send(message)
+
+  def create_message(self, message: discord.Message) -> Message:
+    author = message.author.display_name
+    content = self.normalize_discord(message.clean_content)
+    if message.attachments:
+      content += " [ATT]"
+    return Message(author, content)
+
+  def create_reply(self, message: discord.Message) -> Message | None:
+    if not isinstance(message.reference, discord.MessageReference):
+      return None
+
+    reply = message.reference.resolved
+    if not isinstance(reply, discord.Message):
+      return None
+
+  # TODO: fix imperfect normalization
+  def normalize_mc(self, message: str):
+    return message.replace("\\", "")
+
+  def normalize_discord(self, message: str):
+    return repr(message.strip()).replace('"', '\\"')[1:-1]

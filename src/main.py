@@ -1,22 +1,17 @@
-import argparse
 import logging
+from os import getenv
 
-from bot import PropertyBot
+from bot import NuggTechBot
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Discord bot for the NuggTech server",
-        allow_abbrev=False,
-    )
-    parser.add_argument("--verbosity", help="set verbosity level", default="warning")
+  logger = logging.getLogger("discord.nugg")
+  level = getenv("LOG_LEVEL", default="info").upper()
+  logger.setLevel(level)
 
-    args = parser.parse_args()
-    log_level = getattr(logging, args.verbosity.upper())
-
-    bot = PropertyBot()
-    bot.run(bot.discord_config.token, log_level=log_level)
+  bot = NuggTechBot()
+  bot.run(bot.config.token)
 
 
 if __name__ == "__main__":
-    main()
+  main()
