@@ -1,70 +1,54 @@
 from typing import Literal
 
-import discord
+from discord import Embed, Interaction
+from discord.app_commands import command
 from discord.ext import commands
-from discord import app_commands
 
-import bot
-from bridge import bridge_send
-
-TrackingSubcommand = Literal["start", "stop", "restart"] | None
+from bot import NuggTechBot, Servers
 
 
 class SpawnTracking(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
 
-    async def handle_spawn_tracking(
-        self, target: str, subcommand: TrackingSubcommand
-    ) -> discord.Embed:
-        spawn = await self.bot.response_queue.get()
-        # bold the first line
-        spawn = spawn.replace("--------------------", "**").replace("min", "min**", 1)
-        # format into bulleted list
-        spawn = (
-            spawn.replace(" > ", "\n- **")
-            .replace("s/att", "s/att**")
-            .replace("   - ", "\n - ")
-        )
-        # bold when spawn tracking stops or starts
-        spawn = spawn.replace("Spawning tracking", "\n**Spawning tracking")
-        spawn = spawn.replace("started.", "started.**").replace(
-            "stopped.", "stopped.**"
-        )
+  @command(name="spawntracking", description="/spawn tracking")
+  async def spawn_tracking(
+    self,
+    inter: Interaction,
+    server: Servers,
+    action: Literal["start", "stop", "restart"] | None,
+  ):
+    await inter.response.defer()
 
-        server = self.bot.servers[target]
-        embed = discord.Embed(
-            title="`spawn tracking{}`".format(" " + subcommand if subcommand else ""),
-            description=spawn,
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
+    bridge, server_ = server.value
+    command_ = "spawn tracking"
+    if action:
+      command_ += f" {action}"
 
-        return embed
+    spawn = await bridge.sendr(f"RCON {server_} {command_}")
 
-    @app_commands.command(
-        name="spawntracking", description="send /spawn tracking {option}"
+    # TODO: update formatting
+    spawn = (
+      # bold the first line
+      spawn.replace("--------------------", "**")
+      .replace("min", "min**", 1)
+      # format into bulleted list
+      .replace(" > ", "\n- **")
+      .replace("s/att", "s/att**")
+      .replace("   - ", "\n - ")
+      # bold when start and stop
+      .replace("Spawning tracking started.", "\n**Spawning tracking started.**")
+      .replace("Spawning tracking stopped.", "\n**Spawning tracking stopped.**")
     )
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def spawn_tracking(
-        self,
-        interaction: discord.Interaction,
-        server: app_commands.Choice[str],
-        subcommand: TrackingSubcommand,
-    ):
-        target = server.value
-        await interaction.response.defer()
-        if subcommand:
-            await bridge_send(
-                self.bot.servers, target, f"RCON {target} spawn tracking {subcommand}"
-            )
-        else:
-            await bridge_send(self.bot.servers, target, f"RCON {target} spawn tracking")
-        await interaction.followup.send(
-            embed=await self.handle_spawn_tracking(target, subcommand)
-        )
+
+    await inter.followup.send(
+      embed=Embed(
+        title=f"`/{command_}`",
+        description=spawn,
+        color=server_.color,
+      ).set_footer(text=server_.display)
+    )
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(SpawnTracking(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(SpawnTracking(bot))
