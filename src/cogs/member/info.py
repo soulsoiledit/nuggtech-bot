@@ -1,128 +1,103 @@
 import json
+from random import choice
 
-import discord
+from discord import Color, Embed, Interaction
+from discord.app_commands import command
 from discord.ext import commands
-from discord import app_commands
 
-import bot
-from bridge import bridge_send
+from bot import NuggTechBot, Servers
 
 
 class ServerInfo(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
 
-    async def handle_server_status(self) -> discord.Embed:
-        embed = discord.Embed(title="Servers:", color=0xA6E3A1)
+  @command(description="list servers")
+  async def servers(self, inter: Interaction):
+    await inter.response.defer()
 
-        for server in self.bot.servers.values():
-            target = server.name
-            await bridge_send(self.bot.servers, target, f"RCON {target} list")
-            status = await self.bot.response_queue.get()
+    embed = Embed(title="Servers:")
+    colors: list[Color] = []
+    for bridge in self.bot.bridges:
+      response = await bridge.sendr("LIST")
+      states: dict[str, str] = {server.name: ":x:" for server in bridge.servers}
 
-            state = ""
-            if status:
-                split_status = status.split()
-                online, max = split_status[2], split_status[7]
-                state = f":white_check_mark: ({online}/{max})"
-            else:
-                state = ":x:"
+      for line in response.splitlines():
+        name, state = line.split(maxsplit=1)
+        state = state.split()
+        online, max_players = state[2], state[7]
+        states[name] = f":white_check_mark: ({online}/{max_players})"
 
-            embed.add_field(
-                name="", value=f"**{server.display_name}:** {state}\n", inline=False
-            )
-
-        return embed
-
-    async def handle_playerlist(self, target: str) -> discord.Embed:
-        server = self.bot.servers[target]
-        await bridge_send(self.bot.servers, target, f"RCON {target} list")
-        playerlist = await self.bot.response_queue.get()
-
-        desc = ""
-        if playerlist:
-            if int(playerlist.split()[2]):
-                desc += playerlist.split(": ", maxsplit=1)[1].replace(", ", "\n")
-            else:
-                desc = "**No players are online!**"
-        else:
-            desc = "**The server is offline!**"
-
-        server = self.bot.servers[target]
-        embed = discord.Embed(
-            title=f"Player list for {server.display_name}:",
-            description=desc,
-            color=server.discord_color,
+      for server in bridge.servers:
+        colors.append(server.color)
+        state = states[server.name]
+        _ = embed.add_field(
+          name="",
+          value=f"**{server.display}**: {state}",
+          inline=False,
         )
+    embed.color = choice(colors)
 
-        return embed
+    await inter.followup.send(embed=embed)
 
-    async def handle_server_check(self, target: str) -> discord.Embed:
-        await bridge_send(self.bot.servers, target, "CHECK")
-        health = await self.bot.response_queue.get()
-        health_dict = json.loads(health)
+  @command(description="list online players")
+  async def players(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
 
-        await bridge_send(self.bot.servers, target, "HEARTBEAT")
-        heartbeat = (await self.bot.response_queue.get()) == "true"
+    bridge, server_ = server.value
+    online = await bridge.sendr(f"RCON {server_} list")
 
-        cpu_avg = health_dict["cpu_avg"][1]
-        if cpu_avg is None:
-            cpu_avg = health_dict["cpu_avg"][0]
-        cpu_avg = float(cpu_avg) * 100
+    desc = "The server is offline"
+    if online:
+      desc = "No players are online"
+      if not online.startswith("There are 0"):
+        players = online.partition(": ")[2].split(",")
+        desc = "\n".join(players)
 
-        ram_used = float(health_dict["ram"][0])
-        ram_total = float(health_dict["ram"][1])
-        ram_perc = ram_used / ram_total * 100
+    await inter.followup.send(
+      embed=Embed(
+        title=f"{server_.display} Players:",
+        description=desc,
+        color=server_.color,
+      )
+    )
 
-        disk_perc = float(health_dict["disk_info"][0][2]) * 100
+  @command(description="check server health")
+  async def check(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
 
-        uptime = int(health_dict["uptime"])
-        days = uptime / 86400
-        uptime_msg = f":arrow_up: Server has been up for {days:.1f} days"
+    bridge, server_ = server.value
+    health = json.loads(await bridge.sendr("CHECK"))
 
-        server = self.bot.servers[target]
+    pain = "No"
+    if await bridge.sendr("HEARTBEAT") == "true":
+      pain = "Yes"
 
-        embed = discord.Embed(
-            title=f"NuggTech {server.display_name}",
-            description=uptime_msg,
-            color=server.discord_color,
+    cpu_usage = 100.0 * float(health["cpu_avg"][1])
+
+    ram_used = float(health["ram"][0])
+    ram_total = float(health["ram"][1])
+    ram_usage = 100.0 * ram_used / ram_total
+
+    disk_usage = 100.0 * float(health["disk_info"][0][2])
+    uptime = float(health["uptime"]) / 86400.0
+
+    await inter.followup.send(
+      embed=(
+        Embed(
+          title=f"{server_.display}:",
+          description=f":arrow_up: {uptime:.1f} days",
+          color=server_.color,
         )
-
-        embed.add_field(name=":brain: CPU Avg", value=f"{cpu_avg:.1f}%")
-        embed.add_field(name="", value="\u200b")
-        embed.add_field(name=":ram: RAM Usage", value=f"{ram_perc:.1f}%")
-
-        embed.add_field(name=":cd: Disk Usage", value=f"{disk_perc:.1f}%")
-        embed.add_field(name="", value="\u200b")
-        embed.add_field(name=":two_hearts: Struggling?", value=heartbeat)
-
-        return embed
-
-    @app_commands.command(description="lists servers' online status")
-    async def servers(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        await interaction.followup.send(embed=await self.handle_server_status())
-
-    @app_commands.command(description="lists online players")
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def playerlist(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        await interaction.response.defer()
-        await interaction.followup.send(embed=await self.handle_playerlist(target))
-
-    @app_commands.command(description="check servers health")
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def check(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        await interaction.response.defer()
-        await interaction.followup.send(embed=await self.handle_server_check(target))
+        .add_field(name=":brain: CPU", value=f"{cpu_usage:.1f}%")
+        .add_field(name="\t", value="\t")
+        .add_field(name=":ram: RAM", value=f"{ram_usage:.1f}%")
+        .add_field(name=":cd: Disk", value=f"{disk_usage:.1f}%")
+        .add_field(name="\t", value="\t")
+        .add_field(name=":two_hearts: Pain?", value=pain)
+      )
+    )
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(ServerInfo(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(ServerInfo(bot))
