@@ -1,56 +1,45 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
+import asyncio
 
-import bot
-from bridge import bridge_send
+from discord import Interaction
+from discord.app_commands import command, default_permissions
+from discord.ext import commands
+
+from bot import NuggTechBot, Servers
 
 
 class Management(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
 
-    @app_commands.command(description="Starts a server")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def start(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        # holy this is cursed but thanks NC
-        await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, f"CMD {target} ")
-        await bridge_send(self.bot.servers, target, f"CMD {target} ./startup.sh")
-        await interaction.followup.send(f"Started {target}!")
+  @command(description="start server")
+  @default_permissions()
+  async def start(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+    bridge, server_ = server.value
+    await bridge.send(f"CMD {server_} ./startup.sh")
+    await inter.followup.send(f"Started {server_.display}")
 
-    @app_commands.command(description="Stops a server")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def stop(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, f"RCON {server.value} stop")
-        await interaction.followup.send(f"Stopped {target}!")
+  @command(description="stop server")
+  @default_permissions()
+  async def stop(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+    bridge, server_ = server.value
+    await bridge.send(f"RCON {server_} stop")
+    await inter.followup.send(f"Stopped {server_.display}")
 
-    @app_commands.command(description="Restarts a server (Use with caution!)")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def restart(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        target = server.value
-        # holy this is cursed but thanks NC
-        await interaction.response.defer()
-        await bridge_send(self.bot.servers, target, f"CMD {target} ")
-        await bridge_send(self.bot.servers, target, f"CMD {target} C-c")
-        await bridge_send(self.bot.servers, target, f"CMD {target} ./startup.sh")
-        await interaction.followup.send(f"Restarted {target}!")
+  @command(description="restart server")
+  @default_permissions()
+  async def restart(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+
+    bridge, server_ = server.value
+    await bridge.send(f"RCON {server_} stop")
+    # arbitrary wait
+    await asyncio.sleep(10)
+    await bridge.send(f"CMD {server_} ./startup.sh")
+
+    await inter.followup.send(f"Restarted {server_.display}")
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(Management(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(Management(bot))
