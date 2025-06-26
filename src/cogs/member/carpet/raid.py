@@ -1,6 +1,6 @@
 from typing import Literal
 from discord import Embed, Interaction
-from discord.app_commands import command
+from discord.app_commands import Choice, choices, command
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -11,15 +11,16 @@ class RaidTracking(commands.Cog):
     self.bot: NuggTechBot = bot
 
   @command(name="raidtracking", description="/raid tracking")
+  @choices(server=Servers)
   async def spawn_tracking(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     action: Literal["start", "stop", "restart"] | None,
   ):
-    await inter.response.defer()
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
 
     command_ = f"RCON {server_} raid tracking"
     if action:

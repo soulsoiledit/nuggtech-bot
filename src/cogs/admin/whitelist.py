@@ -1,7 +1,7 @@
 from typing import Literal
 
 from discord import Interaction
-from discord.app_commands import command, default_permissions
+from discord.app_commands import Choice, choices, command, default_permissions
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -13,16 +13,17 @@ class Whitelist(commands.Cog):
 
   @command(description="whitelist players")
   @default_permissions()
+  @choices(server=Servers)
   async def whitelist(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     action: Literal["add", "remove"],
     user: str,
   ):
-    await inter.response.defer(ephemeral=True)
+    _ = await inter.response.defer(ephemeral=True)
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     response = await bridge.sendr(f"RCON {server_} whitelist {action} {user}")
 
     if response.endswith("whitelist"):
@@ -41,16 +42,17 @@ class Whitelist(commands.Cog):
 
   @command(description="op players")
   @default_permissions()
+  @choices(server=Servers)
   async def op(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     action: Literal["add", "remove"],
     user: str,
   ):
-    await inter.response.defer(ephemeral=True)
+    _ = await inter.response.defer(ephemeral=True)
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     command = "op" if action == "add" else "deop"
     response = await bridge.sendr(f"RCON {server_} {command} {user}")
 

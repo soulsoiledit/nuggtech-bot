@@ -1,7 +1,7 @@
 from functools import partial
 
 from discord import Embed, Interaction
-from discord.app_commands import command
+from discord.app_commands import Choice, choices, command
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -16,10 +16,11 @@ class Profile(commands.GroupCog):
     return response.startswith(f"MSG [{server}] [Rcon: ]\n")
 
   @command(description="tick/profile health")
-  async def health(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def health(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
 
     health = await bridge.sendr(
       f"RCON {server_} profile health 20",
@@ -48,10 +49,11 @@ class Profile(commands.GroupCog):
     )
 
   @command(description="tick/profile entities")
-  async def entities(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def entities(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     entities = await bridge.sendr(
       f"RCON {server_} profile entities",
       partial(self.filter_profile, server_.name),

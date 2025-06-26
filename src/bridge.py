@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import NamedTuple, override
 
-import discord
+from discord import Color
 from websockets.asyncio import client
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 from websockets.typing import Data
@@ -19,15 +19,15 @@ class Config(NamedTuple):
   log_channel: int
 
   avatar: str
-  name_color: discord.Color
-  reply_color: discord.Color
+  name_color: Color
+  reply_color: Color
 
 
 class Server(NamedTuple):
   name: str
   display: str
   joinname: str
-  color: discord.Color
+  color: Color
 
   @override
   def __str__(self) -> str:

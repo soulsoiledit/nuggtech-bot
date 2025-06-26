@@ -1,5 +1,5 @@
 from discord import Embed, Interaction
-from discord.app_commands import command, default_permissions
+from discord.app_commands import Choice, choices, command, default_permissions
 from discord.ext import commands
 
 import bot
@@ -20,17 +20,20 @@ class Backup(commands.GroupCog):
 
   @command(description="manage backups")
   @default_permissions()
-  async def create(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
-    bridge, server_ = server.value
+  @choices(server=Servers)
+  async def create(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
+    bridge, server_ = self.bot.get_server(server)
     response = await bridge.sendr(f"BACKUP {server_}")
     await inter.followup.send(response.capitalize())
 
   @command(description="list backups")
-  async def list(self, inter: Interaction, server: Servers, full: bool = False):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def list(self, inter: Interaction, server: Choice[str], full: bool = False):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
+    bridge, server_ = self.bot.get_server(server)
     response = await bridge.sendr("LIST_BACKUPS")
 
     desc: list[str] = []

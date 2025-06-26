@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Literal
 
 from discord import Color, Embed, Interaction
-from discord.app_commands import command
+from discord.app_commands import Choice, choices, command
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -39,14 +39,14 @@ class Counter(commands.Cog):
     self,
     base_command: str,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     counter: Counters = Counters.all,
     action: Actions = "list",
   ):
     pass
-    await inter.response.defer()
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
 
     command_ = base_command
     color = None
@@ -82,20 +82,22 @@ class Counter(commands.Cog):
     await inter.followup.send(embed=embed)
 
   @command(description="/counter")
+  @choices(server=Servers)
   async def counter(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     counter: Counters = Counters.all,
     action: Actions = "list",
   ):
     await self.generic("counter", inter, server, counter, action)
 
   @command(description="/scounter")
+  @choices(server=Servers)
   async def scounter(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     counter: Counters = Counters.all,
     action: Actions = "list",
   ):

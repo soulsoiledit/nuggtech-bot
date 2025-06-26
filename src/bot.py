@@ -3,11 +3,10 @@ import json
 import logging
 import re
 from asyncio import Task, create_task
-from enum import Enum
-from typing import NamedTuple, cast, override
+from typing import NamedTuple, override
 
 import discord
-from discord import TextChannel
+from discord.app_commands import Choice
 from discord.ext import commands
 
 from bridge import MSG, Bridge, Config, Server
@@ -15,19 +14,13 @@ from config import bridges, config
 
 logger = logging.getLogger("discord.nugg")
 
+_servers: dict[tuple[str, str], tuple[Bridge, Server]] = {}
+Servers: list[Choice[str]] = []
 
-# definitely not how enum should be used...
-class _Servers(Enum):
-  @property
-  @override
-  def value(self) -> tuple[Bridge, Server]:
-    return cast(tuple[Bridge, Server], self._value_)
-
-
-_servers = {
-  server.display: (bridge, server) for bridge in bridges for server in bridge.servers
-}
-Servers = _Servers("Servers", _servers)
+for bridge in bridges:
+  for server in bridge.servers:
+    _servers[(server.display, bridge.name)] = (bridge, server)
+    Servers.append(Choice[str](name=server.display, value=bridge.name))
 
 extensions = [
   "admin.debug",
@@ -72,6 +65,9 @@ class NuggTechBot(commands.Bot):
 
     # start all bridges
     self.connect_task = create_task(self.connect_bridges())
+
+  def get_server(self, choice: Choice[str]) -> tuple[Bridge, Server]:
+    return _servers[(choice.name, choice.value)]
 
   # TODO: investigate having a more central processor
   # currently has 1 for each bridge
@@ -199,7 +195,7 @@ class NuggTechBot(commands.Bot):
 
   async def set_webhook(self):
     channel = await self.fetch_channel(self.config.bridge_channel)
-    if not isinstance(channel, TextChannel):
+    if not isinstance(channel, discord.TextChannel):
       raise TypeError("Bridge channel incorrectly configured")
 
     webhooks = await channel.webhooks()
@@ -214,7 +210,7 @@ class NuggTechBot(commands.Bot):
 
   async def log(self, message: str):
     channel = await self.fetch_channel(self.config.log_channel)
-    if not isinstance(channel, TextChannel):
+    if not isinstance(channel, discord.TextChannel):
       raise TypeError("Log channel incorrectly configured")
     _ = await channel.send(message)
 

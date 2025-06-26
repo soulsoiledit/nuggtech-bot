@@ -2,7 +2,7 @@ import json
 from typing import Literal
 
 from discord import Embed, Interaction
-from discord.app_commands import command, describe
+from discord.app_commands import Choice, choices, command, describe
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -27,16 +27,17 @@ class Statistics(commands.Cog):
 
   @command(description="show player stats")
   @describe(full="show all players")
+  @choices(server=Servers)
   async def stat(
     self,
     inter: Interaction,
-    server: Servers,
+    server: Choice[str],
     stat: Leaderboards = "total",
     full: bool = False,
   ):
-    await inter.response.defer()
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     response = await bridge.sendr(
       f"SHELL python3 scripts/stat.py {server_} digs",
       lambda x: x.startswith(rf"MSG [{server_}] {{\"stats\":"),

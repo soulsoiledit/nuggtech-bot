@@ -5,7 +5,6 @@ from discord.ext import commands
 
 from bot import NuggTechBot
 
-
 logger = logging.getLogger("discord.nugg")
 
 
@@ -20,7 +19,7 @@ class Debug(commands.Cog):
   @command(description="reload bot")
   @default_permissions()
   async def reload(self, inter: Interaction):
-    await inter.response.defer(ephemeral=True)
+    _ = await inter.response.defer(ephemeral=True)
 
     await self.bot.load_cogs()
     await self.bot.close_bridges()
@@ -45,8 +44,8 @@ class Debug(commands.Cog):
   @check(is_owner)
   @default_permissions()
   async def sync(self, inter: Interaction):
-    await inter.response.defer(ephemeral=True)
-    _ = await self.sync_commands()
+    _ = await inter.response.defer(ephemeral=True)
+    await self.sync_commands()
     await inter.followup.send("Synced commands")
 
   @sync.error
@@ -54,7 +53,7 @@ class Debug(commands.Cog):
     self, inter: Interaction, error: app_commands.AppCommandError
   ):
     if isinstance(error, app_commands.CheckFailure):
-      await inter.response.send_message("Permission denied", ephemeral=True)
+      _ = await inter.response.send_message("Permission denied", ephemeral=True)
 
   @text_sync.error
   async def text_sync_error(

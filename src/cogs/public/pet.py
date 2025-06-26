@@ -24,7 +24,7 @@ class Pet(commands.Cog):
       chars = math.ceil(length)
       meowsage = "Me{}w! ({} s)".format("o" * chars, length)
 
-    await inter.response.send_message(meowsage)
+    _ = await inter.response.send_message(meowsage)
 
 
 async def setup(bot: NuggTechBot):

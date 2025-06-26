@@ -11,10 +11,13 @@ class Rcon(commands.Cog):
 
   @app_commands.command(description="send rcon command")
   @app_commands.default_permissions()
-  async def rcon(self, inter: discord.Interaction, server: Servers, command: str):
-    await inter.response.defer()
+  @app_commands.choices(server=Servers)
+  async def rcon(
+    self, inter: discord.Interaction, server: app_commands.Choice[str], command: str
+  ):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     response = await bridge.sendr(f"RCON {server_} {command}")
 
     embed = discord.Embed(

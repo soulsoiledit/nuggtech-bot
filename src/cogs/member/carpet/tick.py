@@ -1,6 +1,6 @@
 import re
 from discord import Embed, Interaction
-from discord.app_commands import command
+from discord.app_commands import Choice, choices, command
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -12,10 +12,11 @@ class Tick(commands.GroupCog):
     self.description: str = "/tick commands"
 
   @command(name="warpstatus", description="get tick warp status")
-  async def tick_warp_status(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def tick_warp_status(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
 
     response = await bridge.sendr(f"RCON {server_} tick warp status")
     response = re.sub(r"(Starter|Average|Time|Estimated|\[)", r"\n\1", response)

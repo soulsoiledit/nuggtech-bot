@@ -2,7 +2,7 @@ import json
 from random import choice
 
 from discord import Color, Embed, Interaction
-from discord.app_commands import command
+from discord.app_commands import Choice, choices, command
 from discord.ext import commands
 
 from bot import NuggTechBot, Servers
@@ -14,7 +14,7 @@ class ServerInfo(commands.Cog):
 
   @command(description="list servers")
   async def servers(self, inter: Interaction):
-    await inter.response.defer()
+    _ = await inter.response.defer()
 
     embed = Embed(title="Servers:")
     colors: list[Color] = []
@@ -41,10 +41,11 @@ class ServerInfo(commands.Cog):
     await inter.followup.send(embed=embed)
 
   @command(description="list online players")
-  async def players(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def players(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     online = await bridge.sendr(f"RCON {server_} list")
 
     desc = "The server is offline"
@@ -63,10 +64,11 @@ class ServerInfo(commands.Cog):
     )
 
   @command(description="check server health")
-  async def check(self, inter: Interaction, server: Servers):
-    await inter.response.defer()
+  @choices(server=Servers)
+  async def check(self, inter: Interaction, server: Choice[str]):
+    _ = await inter.response.defer()
 
-    bridge, server_ = server.value
+    bridge, server_ = self.bot.get_server(server)
     health = json.loads(await bridge.sendr("CHECK"))
 
     pain = "No"
