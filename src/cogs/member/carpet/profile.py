@@ -1,105 +1,81 @@
-import re
+from functools import partial
 
-import discord
+from discord import Embed, Interaction
+from discord.app_commands import command
 from discord.ext import commands
-from discord import app_commands
 
-import bot
-from bridge import bridge_send
+from bot import NuggTechBot, Servers
 
 
-class Profile(commands.Cog):
-    def __init__(self, bot: bot.PropertyBot):
-        self.bot = bot
+class Profile(commands.GroupCog):
+  def __init__(self, bot: NuggTechBot):
+    self.bot: NuggTechBot = bot
+    self.description: str = "/profile commands"
 
-    profile_commands = app_commands.Group(
-        name="profile", description="Send profile command to server"
+  def filter_profile(self, server: str, response: str) -> bool:
+    return response.startswith(f"MSG [{server}] [Rcon: ]\n")
+
+  @command(description="tick/profile health")
+  async def health(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+
+    bridge, server_ = server.value
+
+    health = await bridge.sendr(
+      f"RCON {server_} profile health 20",
+      partial(self.filter_profile, server_.name),
+      True,
     )
 
-    async def handle_profile_health(self, target: str):
-        health = await self.bot.profile_queue.get()
-
-        cleaned_health = ""
-        for line in health.split("\n")[1:]:
-            cleaned = re.sub(r"^.*Rcon: (.*)\]", r"\1", line)
-
-            bolded = [
-                "Average tick time",
-                "overworld:",
-                r"the\_nether:",
-                r"the\_end:",
-            ]
-            if any(x in cleaned for x in bolded):
-                cleaned_health += f"**{cleaned}**\n"
-            elif "The Rest, whatever" in cleaned:
-                cleaned_health += f"*{cleaned}*\n"
-            else:
-                cleaned_health += f"{cleaned}\n"
-
-        server = self.bot.servers[target]
-        embed = discord.Embed(
-            title="`/profile health`",
-            description=cleaned_health,
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
-
-        return embed
-
-    async def handle_profile_entities(self, target: str):
-        server = self.bot.servers[target]
-        entities = await self.bot.profile_queue.get()
-
-        cleaned_entities = ""
-        for line in entities.split("\n")[1:]:
-            cleaned = re.sub(r"^.*Rcon: (.*)\]", r"\1", line)
-
-            bolded = ["Average tick time", "Top 10 counts:", "Top 10 CPU hogs:"]
-            if any(x in line for x in bolded):
-                cleaned_entities += "**" + cleaned + "**\n"
-            else:
-                cleaned_entities += f"{cleaned}\n"
-
-        server = self.bot.servers[target]
-        embed = discord.Embed(
-            title="`/profile entities`",
-            description=cleaned_entities,
-            color=server.discord_color,
-        )
-        embed.set_footer(text=server.display_name)
-
-        return embed
-
-    @profile_commands.command(
-        description="Send /profile health command to specified server"
+    health = (
+      health.replace(f"[{server_}] [Rcon: ", "").replace("]", "").strip().splitlines()
     )
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def health(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        await interaction.response.defer()
 
-        target = server.value
-        await bridge_send(self.bot.servers, target, f"RCON {target} profile health")
-        await interaction.followup.send(embed=await self.handle_profile_health(target))
+    desc: list[str] = []
+    for line in health:
+      if not line.startswith(("- ", "Carpet:", "Scarpet", "The Rest,")):
+        line = f"**{line}**"
+      if line.startswith("The Rest,"):
+        line = f"*{line}*"
+      desc.append(line)
 
-    @profile_commands.command(
-        description="Send /profile entities command to specified server"
+    await inter.followup.send(
+      embed=Embed(
+        title="`/profile health`",
+        description="\n".join(desc),
+        color=server_.color,
+      ).set_footer(text=server_.display)
     )
-    @app_commands.describe(server="target server")
-    @app_commands.choices(server=bot.server_choices)
-    async def entities(
-        self, interaction: discord.Interaction, server: app_commands.Choice[str]
-    ):
-        await interaction.response.defer()
 
-        target = server.value
-        await bridge_send(self.bot.servers, target, f"RCON {target} profile entities")
-        await interaction.followup.send(
-            embed=await self.handle_profile_entities(target)
-        )
+  @command(description="tick/profile entities")
+  async def entities(self, inter: Interaction, server: Servers):
+    await inter.response.defer()
+
+    bridge, server_ = server.value
+    entities = await bridge.sendr(
+      f"RCON {server_} profile entities",
+      partial(self.filter_profile, server_.name),
+      True,
+    )
+
+    entities = (
+      entities.replace(f"[{server_}] [Rcon: ", "").replace("]", "").strip().splitlines()
+    )
+
+    desc: list[str] = []
+    for line in entities:
+      if not line.startswith("- "):
+        line = f"**{line}**"
+      desc.append(line)
+
+    await inter.followup.send(
+      embed=Embed(
+        title="`/profile entities`",
+        description="\n".join(desc),
+        color=server_.color,
+      ).set_footer(text=server_.display)
+    )
 
 
-async def setup(bot: bot.PropertyBot):
-    await bot.add_cog(Profile(bot))
+async def setup(bot: NuggTechBot):
+  await bot.add_cog(Profile(bot))
