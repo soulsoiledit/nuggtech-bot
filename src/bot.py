@@ -73,7 +73,7 @@ class NuggTechBot(commands.Bot):
   # currently has 1 for each bridge
   async def process(self, bridge: Bridge):
     async for resp in bridge.connect():
-      msg = self.normalize_mc(resp.message)
+      msg = self.normalize_for_discord(resp.message)
       if chat := re.search(r"<(.*?)> (.*)$", msg):
         logger.info(msg)
         await self.handle_chat(resp, chat)
@@ -132,8 +132,7 @@ class NuggTechBot(commands.Bot):
 
     tellraw = json.dumps(
       [
-        self.normalize_discord(f"{user} {action}"),
-        " ",
+        self.normalize_for_mc(f"{user} {action} "),
         {
           "text": source.joinname,
           "color": str(source.color),
@@ -217,7 +216,7 @@ class NuggTechBot(commands.Bot):
 
   def create_message(self, message: discord.Message) -> Message:
     author = message.author.display_name
-    content = self.normalize_discord(message.clean_content)
+    content = self.normalize_for_mc(message.clean_content)
     if message.attachments:
       content += " [ATT]"
     return Message(author, content)
@@ -231,8 +230,8 @@ class NuggTechBot(commands.Bot):
       return None
 
   # TODO: fix imperfect normalization
-  def normalize_mc(self, message: str):
+  def normalize_for_discord(self, message: str):
     return message.replace("\\", "")
 
-  def normalize_discord(self, message: str):
-    return repr(message.strip()).replace('"', '\\"')[1:-1]
+  def normalize_for_mc(self, message: str):
+    return repr(message).replace('"', '\\"')[1:-1]
