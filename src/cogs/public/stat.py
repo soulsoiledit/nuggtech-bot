@@ -44,7 +44,6 @@ class Statistics(commands.Cog):
     )
 
     response = response.strip().replace(f"[{server_}]", "").replace("<--[HERE]", "")
-    response = self.bot.normalize_for_mc(response)
 
     stats: Stats = json.loads(response)["stats"]
     stat_ = {player: stats[player].get(stat, 0) for player in stats}
