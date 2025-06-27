@@ -94,20 +94,13 @@ class Bridge:
     self,
     command: str,
     accept: Callable[[str], bool] = lambda x: not x.startswith("MSG"),
-    delayed: bool = False,
   ) -> str:
-    cmd = command.split(maxsplit=1)[0]
     async for websocket in client.connect(self.uri):
       await websocket.send(self.password)
       await websocket.send(command)
 
       async for response in websocket:
         response = str(response)
-
-        # wait for second response
-        if delayed:
-          delayed = not response.startswith(cmd)
-          continue
 
         if not accept(response):
           continue
@@ -117,7 +110,6 @@ class Bridge:
         if len(sp) == 1:
           return ""
         return sp[1]
-
     return ""
 
   def _parse(self, response: Data) -> MSG | None:

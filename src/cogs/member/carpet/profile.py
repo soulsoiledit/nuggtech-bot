@@ -25,7 +25,6 @@ class Profile(commands.GroupCog):
     health = await bridge.sendr(
       f"RCON {server_} profile health 20",
       partial(self.filter_profile, server_.name),
-      True,
     )
 
     health = (
@@ -57,7 +56,6 @@ class Profile(commands.GroupCog):
     entities = await bridge.sendr(
       f"RCON {server_} profile entities",
       partial(self.filter_profile, server_.name),
-      True,
     )
 
     entities = (
