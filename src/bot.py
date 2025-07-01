@@ -101,6 +101,7 @@ class NuggTechBot(commands.Bot):
   async def handle_chat(self, response: MSG, chat: re.Match[str]):
     author, message = chat.groups()
 
+    author = author.replace(r"\_", "_")
     if " " in author:
       avatar = "https://mc-heads.net/head/steve"
     else:

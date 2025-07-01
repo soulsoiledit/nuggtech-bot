@@ -178,6 +178,5 @@ cython_debug/
 .envrc
 
 src/config.py
-extra/taurus
-extra/local
+extra/
 todo.md
