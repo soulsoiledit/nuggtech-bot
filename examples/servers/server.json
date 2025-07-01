@@ -1,0 +1,12 @@
+{
+  "name": "server",
+  "host": "tmux",
+  "game": {
+    "file_path": "/path/to/server/directory",
+    "chat_bridge": true
+  },
+  "rcon": {
+    "port": 25575,
+    "password": "the_rcon_password_you_set"
+  }
+}
