@@ -229,3 +229,5 @@ class NuggTechBot(commands.Bot):
     reply = message.reference.resolved
     if not isinstance(reply, discord.Message):
       return None
+
+    return self.create_message(reply)
