@@ -12,19 +12,24 @@ class Pet(commands.Cog):
   def __init__(self, bot: NuggTechBot):
     self.bot: NuggTechBot = bot
 
-  @app_commands.command(description="pet nuggcat")
-  async def pet(self, inter: discord.Interaction):
-    length = round(random.uniform(0, 7.0), 1)
-    if length == 0.0:
-      meowsage = "Mw! (1 ns)"
-      pass
+  def meow(self, maximum, mean, stdev) -> str:
+    length = round(random.uniform(0, maximum), 1)
+    if length == 0:
+      return "Mw! (1 ns)"
     else:
-      if length == 7.0:
-        length = 7.0 + abs(random.gauss(0, 10))
+      if length == maximum:
+        length += abs(random.gauss(mean, stdev))
       chars = math.ceil(length)
       meowsage = "Me{}w! ({} s)".format("o" * chars, length)
+      return meowsage
 
-    _ = await inter.response.send_message(meowsage)
+  @app_commands.command(description="pet nuggcat")
+  async def pet(self, inter: discord.Interaction):
+    await inter.response.send_message(self.meow(7, 0, 1))
+
+  @app_commands.command(description="boop nuggcat")
+  async def boop(self, inter: discord.Interaction):
+    await inter.response.send_message(self.meow(2, 0, 0))
 
 
 async def setup(bot: NuggTechBot):
