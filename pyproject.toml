@@ -6,8 +6,8 @@ authors = ["Soi <no.sleep410@passinbox.com>"]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "discord-py>=2.4.0",
- "websockets>=14.1",
+  "discord-py>=2.6.4",
+  "websockets>=15.0.1",
 ]
 
 [tool.ruff]
